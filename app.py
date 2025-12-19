@@ -1,154 +1,146 @@
 import streamlit as st
 from openai import OpenAI
-import re  # 必须导入正则表达式库
+import re
 
 # 1. 页面配置
-st.set_page_config(page_title="AI 电影导演 v4.1", layout="wide", page_icon="🎬")
+st.set_page_config(page_title="AI 叙事导演系统 v5.0", layout="wide", page_icon="🎬")
 
-# 初始化 Session State
-if 'step1_result' not in st.session_state:
-    st.session_state['step1_result'] = ""
+if 'storyboard_raw' not in st.session_state:
+    st.session_state['storyboard_raw'] = ""
 
-# 2. 侧边栏：配置中心
-st.sidebar.title("⚙️ 系统配置")
-api_key = st.sidebar.text_input("1. 输入 API Key", type="password")
+# 2. 侧边栏：API 配置
+st.sidebar.title("🎬 导演工作站")
+api_key = st.sidebar.text_input("1. API Key", type="password")
 base_url = st.sidebar.text_input("2. 接口地址", value="https://blog.tuiwen.xyz/v1")
 
-st.sidebar.markdown("---")
-st.sidebar.subheader("3. 模型设置")
-model_options = [
-    "deepseek-chat", 
-    "gpt-4o", 
-    "claude-3-5-sonnet-20240620", 
-    "gemini-1.5-pro",
-    "自定义模型 (手动输入)"
-]
-selected_option = st.sidebar.selectbox("选择模型", model_options)
-
-if selected_option == "自定义模型 (手动输入)":
-    model_id = st.sidebar.text_input("请输入具体的 Model ID", placeholder="例如：gpt-4-turbo")
+model_options = ["gpt-4o", "claude-3-5-sonnet-20240620", "deepseek-chat", "自定义模型"]
+selected_option = st.sidebar.selectbox("3. 选择大脑 (建议用 GPT-4o 或 Claude)", model_options)
+if selected_option == "自定义模型":
+    model_id = st.sidebar.text_input("Model ID")
 else:
     model_id = selected_option
 
-st.title("🎬 电影解说全流程分镜工具")
-st.caption("精准字数控制 | 叙事节奏优化 | MJ + 即梦提示词生成")
+st.title("🎥 AI 叙事导演分镜系统")
+st.markdown("---")
 
-# --- 第一阶段：逻辑分镜 ---
-st.header("第一步：精准节奏分镜")
-st.info("💡 **分镜准则**：目标字数 **25-35字**。此长度配音约为 4-5秒，完美对齐视频素材。")
+# --- 第一阶段：叙事逻辑拆解 ---
+st.header("第一步：叙事节奏与镜头逻辑分析")
+st.info("💡 **导演逻辑**：AI 会先深度阅读原文，分析每一处情感转折、动作连贯性以及视觉重点，然后再确定分镜切分点。")
 
 uploaded_file = st.file_uploader("📂 上传文案 (TXT)", type=['txt'])
 
 if uploaded_file:
-    # 处理编码
-    raw_bytes = uploaded_file.getvalue()
-    try:
-        raw_text = raw_bytes.decode("utf-8")
-    except:
-        raw_text = raw_bytes.decode("gbk")
-    
-    # 彻底抹除格式，合并为纯文字流
-    clean_stream = "".join(raw_text.split())
+    raw_text = uploaded_file.getvalue().decode("utf-8", errors="ignore")
+    # 保持文案的连贯性
+    full_story = " ".join(raw_text.split())
 
-    if st.button("🚀 执行精准节奏分镜", use_container_width=True):
-        if not api_key or not model_id:
-            st.error("❌ 请先配置 API Key 和选择模型！")
+    if st.button("🚀 开始深度剧情解析与分镜", use_container_width=True):
+        if not api_key:
+            st.error("请配置 API Key")
         else:
             client = OpenAI(api_key=api_key, base_url=base_url)
             
-            # 第一步提示词：增加字数区间的强硬要求
-            STEP1_PROMPT = """你是一个极其严谨的电影分镜导演。
-你的任务是将文字流拆分为【5秒内可完成】的视觉分镜。
+            # 第一步提示词：重点在于“思考”
+            STEP1_PROMPT = """你是一位拥有 20 年经验的资深电影导演和剪辑专家。
+你的任务是将提供的解说文案转化为充满叙事感和节奏感的分镜脚本。
 
-### 核心分镜准则（物理级要求）：
-1. **黄金字数区间**：每个分镜文案必须控制在 **25 到 35 个汉字** 之间。
-2. **合并与拆分逻辑**：
-   - 如果原文一句话太短（如10字），必须合并相邻内容凑足25-35字，确保镜头有内容可拍。
-   - 如果原文一句话太长（如50字以上），必须从逻辑断点切开，分成两个分镜。
-3. **单一视觉原则**：一个分镜（5秒）只允许包含一个核心动作或一个核心场景描述。
-4. **零增删改**：禁止改动原文任何字词，不准加戏，不准删减。
-5. **格式**：数字序号. 文案内容
+### 导演思考路径（请按此逻辑执行）：
+1. **剧情深度分析**：分析文案中的每一个场景。哪个时刻是情绪高潮？哪里是环境铺垫？哪里是动作冲突？
+2. **确定视觉节奏**：
+   - 对于【动作戏/冲突感】：分镜应更密集、简短，展现动态。
+   - 对于【情感戏/环境描写】：分镜可以稍微舒缓，保持意境。
+3. **寻找逻辑断点**：
+   - 必须在人物动机改变、视角变化、或是一个完整意群结束时切分。
+   - 彻底打破原文原有的段落，根据你脑海中的画面运动感重新构筑分镜。
+4. **物理限制（软约束）**：
+   - 每个分镜文案控制在 20-40 字之间（对应 3.5-5.5 秒）。
+   - 这不是死任务，如果一句关键台词很有爆发力，宁可分镜短一点（10字）也要保住爆发点。
+   - 严禁让一个分镜（5秒）承载过多的动作信息，如果一句话里包含了三个以上的动作（如：推门、进屋、关窗、坐下），必须拆开。
+
+### 输出规则：
+- 严禁修改原文任何一个字。
+- 仅输出：[序号]. [文案内容]
+- 在每一组分镜前，请简单标注你这一段的【导演意图】（用括号注明）。
+
+### 示例格式：
+1.（全景展现孤寂氛围）他一个人静静地走在雪地里，北风呼啸，背后是空无一人的村落。
+2.（近景特写动作）他停下脚步，缓缓低下头，看着那串即将被大雪覆盖的脚印。
 """
 
-            with st.spinner("正在精准计算叙事节奏..."):
+            with st.spinner("导演正在深度阅读剧情，构思画面节奏..."):
                 try:
                     response = client.chat.completions.create(
                         model=model_id,
-                        messages=[
-                            {"role": "system", "content": STEP1_PROMPT},
-                            {"role": "user", "content": f"请对以下文字流进行精准分镜：\n\n{clean_stream}"}
-                        ],
-                        temperature=0.1
+                        messages=[{"role": "system", "content": STEP1_PROMPT},
+                                  {"role": "user", "content": full_story}],
+                        temperature=0.5 # 提高一些创造力，让分镜不那么死板
                     )
-                    st.session_state['step1_result'] = response.choices[0].message.content
+                    st.session_state['storyboard_raw'] = response.choices[0].message.content
                 except Exception as e:
-                    st.error(f"调用失败: {str(e)}")
+                    st.error(f"处理失败: {str(e)}")
 
-# 展示分镜并进行实时字数监测
-if st.session_state['step1_result']:
-    st.subheader("📋 分镜草案检查（颜色代表字数合规度）")
+if st.session_state['storyboard_raw']:
+    st.subheader("📋 导演分镜方案（含镜头意图分析）")
     
-    # 解析并统计字数
-    lines = st.session_state['step1_result'].split('\n')
+    # 解析并预览，增加视觉计数
+    lines = st.session_state['storyboard_raw'].split('\n')
     for line in lines:
         if line.strip():
-            # 使用正则表达式去掉开头的数字和标点
-            text_only = re.sub(r'^\d+[\.、\s]+', '', line)
-            char_count = len(text_only)
-            
-            if char_count > 40:
-                st.error(f"🔴 过长 ({char_count}字) - 建议拆分：{line}")
-            elif char_count < 20:
-                st.warning(f"🟡 过短 ({char_count}字) - 建议合并：{line}")
-            else:
-                st.success(f"🟢 完美 ({char_count}字)：{line}")
+            # 简单字数检测供参考
+            text_part = re.sub(r'^\d+[\.、\s]+', '', line)
+            text_part = re.sub(r'\(.*?\)', '', text_part) # 去掉意图标注
+            char_count = len(text_part)
+            if char_count > 45: st.error(f"🔴 字数较多 ({char_count}字)：{line}")
+            elif char_count > 0: st.success(f"🟢 分镜稳定 ({char_count}字)：{line}")
 
-    st.session_state['step1_result'] = st.text_area("✍️ 在此微调分镜（调整完点击下方按钮生成提示词）", st.session_state['step1_result'], height=300)
+    st.session_state['storyboard_raw'] = st.text_area("✍️ 导演可以手动微调叙事点", st.session_state['storyboard_raw'], height=300)
 
     st.markdown("---")
 
-    # --- 第二阶段：视觉描述 ---
-    st.header("第二步：视觉扩充（MJ + 即梦）")
+    # --- 第二阶段：全视觉扩充 ---
+    st.header("第二步：视觉化扩充（MJ 图片 + 即梦 AI 视频描述）")
     
-    char_desc = st.text_area("👤 角色及着装核心设定（非常重要）", 
-                             placeholder="例：林凡：25岁，玄色长袍，腰间挂剑，目光如电。\n柳依依：18岁，紫色罗裙，发簪缀珍珠。",
+    char_desc = st.text_area("👤 角色及着装核心设定", 
+                             placeholder="例：林凡：25岁，玄色刺绣长袍，目光如电，黑色马尾，性格隐忍。",
                              height=100)
     
-    if st.button("🎨 生成视觉提示词与动作方案", use_container_width=True):
+    if st.button("🎨 生成全方位视觉制作提示词", use_container_width=True):
         if not char_desc:
-            st.error("❌ 请填写角色描述，否则画面无法保持一致。")
+            st.error("请填写核心角色描述以保持视觉一致性。")
         else:
             client = OpenAI(api_key=api_key, base_url=base_url)
             
-            STEP2_PROMPT = f"""你是一个视觉导演。根据提供的【分镜文案】和【角色设定】，设计分镜画面。
+            STEP2_PROMPT = f"""你是一个顶级的视觉概念设计师和 AI 提示词专家。
+请根据提供的【分镜脚本】（包含导演意图）和【角色设定】，生成视觉指令。
 
-角色设定：{char_desc}
+核心角色信息：{char_desc}
 
-### 输出规范：
-[序号]. [文案内容]
-画面描述：[静态描述：场景、光影、人物特征、服装细节、视角。禁止动词。]
-视频生成：[动态描述：描述分镜内唯一的那个核心动作，确保5秒内能做完。包含神态变化和镜头运动。]
+### 处理原则：
+1. **视觉一致性**：每一个分镜的画面描述必须包含角色的关键视觉特征，确保 Midjourney 生成的人像不跳戏。
+2. **导演意图转化**：根据括号里的导演意图（如：特写、全景、俯瞰），在画面描述中设定相应的构图和光影。
+3. **动态视频设计**：视频描述必须基于画面底图，设计出符合文案逻辑的动作，确保 5 秒内动作流畅、有张力。
+
+### 输出格式（严格执行）：
 ---
-### 核心要求：
-1. 原文文案严禁改动。
-2. 每个分镜必须包含完整的角色外貌特征，防止AI绘画跳戏。"""
+[序号]. [文案内容]
+【画面描述】：[MJ专用，静态场景、全量角色特征、光影细节、构图视角、氛围。]
+【视频生成】：[即梦/Luma专用，描述镜头运动、人物具体的细微神态变化、核心动作逻辑。]
+---"""
 
-            with st.spinner("正在规划视觉宇宙..."):
+            with st.spinner("视觉设计师正在根据导演意图生成提示词..."):
                 try:
                     response = client.chat.completions.create(
                         model=model_id,
-                        messages=[
-                            {"role": "system", "content": STEP2_PROMPT},
-                            {"role": "user", "content": st.session_state['step1_result']}
-                        ],
+                        messages=[{"role": "system", "content": STEP2_PROMPT},
+                                  {"role": "user", "content": st.session_state['storyboard_raw']}],
                         temperature=0.4
                     )
                     final_output = response.choices[0].message.content
-                    st.subheader("🎥 最终制作全案")
+                    st.subheader("🎥 最终视频制作全流程脚本")
                     st.write(final_output)
-                    st.download_button("📥 下载完整脚本", final_output, file_name="电影感分镜脚本.txt")
+                    st.download_button("📥 下载完整导演脚本", final_output, file_name="电影感制作脚本.txt")
                 except Exception as e:
                     st.error(f"处理失败: {str(e)}")
 
 st.markdown("---")
-st.caption("分镜助手 v4.1 | 修复 re 模块导入问题 | 强化黄金字数区间控制")
+st.caption("AI 导演系统 v5.0 | 叙事为本，技术为辅")
