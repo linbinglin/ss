@@ -18,102 +18,112 @@ if model_id == "自定义":
 
 st.title("🎬 电影解说全流程分镜工具")
 
-# --- 第一阶段：剧情分析与逻辑分镜 ---
-st.header("第一阶段：剧情逻辑切分")
-st.info("目标：打碎原文段落，按‘动作/镜头/时长’重新构建分镜骨架。")
+# --- 第一阶段：纯文本逻辑切分 ---
+st.header("第一阶段：原文逻辑分镜（零增删）")
+st.info("⚠️ 此步骤仅负责对原文进行分行和编号。规则：不准多一个字，不准少一个字，不准改一个字。")
 
 uploaded_file = st.file_uploader("上传文案 (TXT)", type=['txt'])
 
 if uploaded_file:
-    raw_text = uploaded_file.getvalue().decode("utf-8", errors="ignore")
-    # 清洗文本：去掉多余换行，合并成一段话，强制 AI 无法参考原段落
-    processed_text = " ".join(raw_text.split())
+    # 处理编码
+    raw_bytes = uploaded_file.getvalue()
+    try:
+        raw_text = raw_bytes.decode("utf-8")
+    except:
+        raw_text = raw_bytes.decode("gbk")
     
-    st.subheader("📄 原文内容（已清洗）")
-    st.text_area("清洗后的文本流", processed_text, height=100)
+    # 预处理：去掉干扰的空行，保证文本连续
+    processed_text = "".join([line.strip() for line in raw_text.splitlines() if line.strip()])
+    
+    st.subheader("📄 原文内容确认")
+    st.text_area("待处理全文", processed_text, height=100)
 
-    if st.button("🚀 执行专业剧情分镜", use_container_width=True):
+    if st.button("🚀 开始精确切分", use_container_width=True):
         if not api_key:
             st.error("请填入 API Key")
         else:
             client = OpenAI(api_key=api_key, base_url=base_url)
             
-            # 强化分镜师角色的提示词
-            STEP1_PROMPT = """你是一个拥有10年经验的电影分镜导演。你的任务是彻底读懂以下剧情，并进行【画面级】拆解。
+            # 强化版“零改动”提示词
+            STEP1_PROMPT = """你是一个机械化的文本切分器。你的任务是将用户提供的文案，按照逻辑进行分行并添加序号。
+
+### 核心铁律（必须死守）：
+1. **禁止增删改**：严禁遗漏原文任何一个字，严禁添加任何原文之外的文字（包括不准添加“场景：”、“旁白：”、“镜头：”等修饰词）。
+2. **唯一任务**：你只负责在合适的地方按下“回车键”并加上数字序号。
+3. **切分准则**：
+   - 每行文字（含标点）绝对不能超过40个字（为了适配5秒视频）。
+   - 必须根据动作转折、场景切换、对话切换进行分行。
+   - 即使原文一句话很长，只要超过40个字，就必须从中间逻辑断点处切开。
+4. **输出验证**：如果把你的输出内容去掉序号并合并，必须与原文完全一致，哪怕一个标点符号都不能变。
+
+### 输出示例要求：
+1.原文内容第一部分
+2.原文内容第二部分
+...
+"""
             
-            ### 你的思考逻辑：
-            1. **深度读懂**：先理解故事的情绪转折、关键动作和环境切换。
-            2. **彻底粉碎**：忽略原文的任何分段，你要根据“视觉画面感”重新切分。
-            3. **切分准则**：
-               - 当人物开始一个新动作时（如：从坐下到站起），必须切分。
-               - 当镜头需要切换视角时（如：从双人对峙到角色特写），必须切分。
-               - 当场景或光影发生变化时，必须切分。
-               - **时长对齐**：为了适配5秒视频，每行文字严格控制在35-40个汉字以内。如果一句话太长，必须按语义节奏拆分为两行。
-            
-            ### 输出格式：
-            1. 分镜内容
-            2. 分镜内容
-            ...
-            
-            严禁遗漏任何原文文字，严禁添加任何额外解说词。
-            """
-            
-            with st.spinner("导演正在深度阅读剧情并规划镜头..."):
+            with st.spinner("正在进行手术级切分..."):
                 response = client.chat.completions.create(
                     model=model_id,
                     messages=[
                         {"role": "system", "content": STEP1_PROMPT},
-                        {"role": "user", "content": f"请粉碎并重构这段剧情的视觉分镜：\n\n{processed_text}"}
+                        {"role": "user", "content": f"请对以下原文进行物理切分，严禁改变或添加文字：\n\n{processed_text}"}
                     ],
-                    temperature=0.3
+                    temperature=0.0  # 设置为0，彻底消除AI的创造性
                 )
                 st.session_state['step1_result'] = response.choices[0].message.content
 
-# 展示第一阶段结果并允许修改
+# 展示第一阶段结果
 if st.session_state['step1_result']:
-    st.subheader("📋 导演建议分镜（可编辑）")
-    st.session_state['step1_result'] = st.text_area("如果分镜太少或太多，请在此微调", st.session_state['step1_result'], height=300)
+    st.subheader("📋 逻辑分镜结果（核对原文文字）")
+    st.session_state['step1_result'] = st.text_area("请检查是否有多余字句，如有可手动修改", st.session_state['step1_result'], height=300)
 
     st.markdown("---")
 
-    # --- 第二阶段：视觉描述扩充 ---
-    st.header("第二阶段：视觉提示词扩充")
+    # --- 第二阶段：视觉提示词扩充 ---
+    st.header("第二阶段：基于分镜生成视觉描述")
     
-    char_desc = st.text_area("👤 角色及着装统一描述", 
-                             placeholder="例如：林风：25岁，剑眉星目，黑色劲装，腰佩长剑。\n苏晴：20岁，温婉如水，淡紫色罗裙，发簪缀珍珠。",
+    char_desc = st.text_area("👤 角色及着装描述（用于维持视觉一致性）", 
+                             placeholder="例如：林风：20岁，黑色劲装，马尾辫。\n苏晴：18岁，紫色罗裙，蝴蝶发饰。",
                              height=100)
     
-    if st.button("🎨 生成视觉 & 视频提示词", use_container_width=True):
+    if st.button("🎨 生成 AI 绘画与视频指令", use_container_width=True):
         if not char_desc:
-            st.warning("请填写角色描述，否则画面会产生割裂感。")
+            st.warning("请填写角色描述，确保 MJ 画出来的人物不走样。")
         else:
             client = OpenAI(api_key=api_key, base_url=base_url)
             
-            STEP2_PROMPT = f"""你是一个顶级的视觉概念艺术家。
-            请根据我提供的【分镜文案】和【角色设定】，为每一个分镜补全视觉细节。
+            # 这里的提示词允许 AI 发挥想象力去描述画面，但要求 [原文文案] 保持不变
+            STEP2_PROMPT = f"""你是一个视觉设计师。请为下方的分镜文案配上视觉描述。
             
-            角色设定：{char_desc}
+            角色统一设定：{char_desc}
             
-            ### 输出规则：
-            [序号]. [文案]
-            画面描述：[描述当前分镜的静态画面。包含：具体的环境、光影氛围、人物的外表、服装细节、镜头视角（特写/全景/俯拍）。禁止动作词。]
-            视频生成：[描述当前分镜的动态过程。包含：人物具体的动作（如：缓缓转头、泪水滑落）、镜头运动（如：慢速推近、环绕拍摄）。]
+            ### 任务要求：
+            1. 每一组输出包含：序号、原文文案、画面描述、视频生成。
+            2. **原文复读**：[文案]部分必须直接引用我提供的内容，严禁改动。
+            3. **画面描述（MJ）**：描述静态细节。包含场景、人物外貌、服装、光影、视角。禁止动作。
+            4. **视频生成（即梦）**：基于画面，描述动态。包含动作变化、神态、镜头运动。
+            
+            ### 输出格式：
+            [序号]. [原文文案（禁止改动）]
+            画面描述：...
+            视频生成：...
             ---
             """
             
-            with st.spinner("正在绘制画面并设计动态镜头..."):
+            with st.spinner("正在构建视觉宇宙..."):
                 response = client.chat.completions.create(
                     model=model_id,
                     messages=[
                         {"role": "system", "content": STEP2_PROMPT},
                         {"role": "user", "content": st.session_state['step1_result']}
                     ],
-                    temperature=0.4
+                    temperature=0.5
                 )
                 final_output = response.choices[0].message.content
-                st.subheader("🎥 全流程脚本（可直接用于生产）")
+                st.subheader("🎥 最终全流程脚本")
                 st.write(final_output)
-                st.download_button("📥 下载完整脚本", final_output, file_name="电影分镜全脚本.txt")
+                st.download_button("📥 下载完整脚本", final_output, file_name="全流程分镜脚本.txt")
 
 st.markdown("---")
-st.caption("提示：先做好第一阶段的节奏把控，再进行第二阶段的细节填充，效果最佳。")
+st.caption("提示：第一步设置 Temperature 为 0，确保了 AI 不会乱加戏；第二步设置 Temperature 为 0.5，确保了画面描述足够丰富。")
