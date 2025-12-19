@@ -1,80 +1,89 @@
 import streamlit as st
-import google.generativeai as genai
-import io
+import requests
+import json
 
-st.set_page_config(page_title="漫剧自动分镜工具", layout="centered")
+# 页面配置
+st.set_page_config(page_title="漫剧自动化分镜助手", layout="wide")
 
-st.title("🎬 漫剧分镜自动处理系统")
-st.caption("输入原始剧本文本，自动按照对话、动作、场景切换生成标准分镜")
+st.title("🎬 漫剧剧情自动化分镜整理工具")
+st.markdown("上传剧情文本，利用大模型自动完成分镜切分。")
 
-# 侧边栏配置
+# --- 侧边栏：API 配置 ---
 with st.sidebar:
-    st.header("1. 密钥配置")
-    api_key = st.text_input("输入 Gemini API Key:", type="password")
-    # 使用更准确的模型 ID
-    model_choice = st.selectbox("选择模型", [
-        "gemini-1.5-flash-latest", 
-        "gemini-1.5-pro-latest",
-        "gemini-2.0-flash-exp" # 备选最新实验版
-    ])
-    st.markdown("---")
-    st.info("💡 如果 1.5 系列报错，请尝试在 ID 后加上 '-latest' 或选择其他版本。")
+    st.header("API 设置")
+    model_provider = st.selectbox("选择模型供应商", ["DeepSeek", "ChatGPT (OpenAI)", "Gemini", "Groq", "豆包 (火山引擎)"])
+    api_key = st.text_input("输入 API Key", type="password")
+    
+    if model_provider == "DeepSeek":
+        base_url = "https://api.deepseek.com/v1/chat/completions"
+        model_name = "deepseek-chat"
+    elif model_provider == "ChatGPT (OpenAI)":
+        base_url = "https://api.openai.com/v1/chat/completions"
+        model_name = "gpt-4o"
+    elif model_provider == "Gemini":
+        # Gemini 通常有专门的 SDK，此处展示通用的 OpenAI 兼容格式
+        base_url = "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions"
+        model_name = "gemini-1.5-pro"
+    elif model_provider == "Groq":
+        base_url = "https://api.groq.com/openai/v1/chat/completions"
+        model_name = "llama-3.1-70b-versatile"
+    elif model_provider == "豆包 (火山引擎)":
+        base_url = "https://ark.cn-beijing.volces.com/api/v3/chat/completions"
+        model_name = st.text_input("输入 Endpoint ID (豆包需要)", value="")
 
-# 文件上传
-uploaded_file = st.file_uploader("2. 上传剧本文件 (TXT)", type=["txt"])
+# --- 主界面：文件处理 ---
+uploaded_file = st.file_uploader("选择本地文本文件 (.txt)", type=["txt"])
 
-if uploaded_file and api_key:
-    # 自动读取内容
+if uploaded_file is not None:
+    # 读取文本内容
     content = uploaded_file.read().decode("utf-8")
     
-    if st.button("开始自动分镜处理"):
-        try:
-            genai.configure(api_key=api_key)
-            
-            # 这里的模型名有时需要处理，如果 404，尝试加上后缀
-            target_model = model_choice
-            model = genai.GenerativeModel(target_model)
-            
-            prompt = f"""
-            你是一个资深的漫剧分镜师。任务：将以下剧本进行物理分镜处理。
-            
-            严格规范：
-            1. 必须保留原文的所有文字，禁止遗漏、修改或自行扩写。
-            2. 遇到以下情况必须切换至下一行并编号：
-               - 不同的角色开始说话
-               - 发生了新的动作或身体接触
-               - 环境或背景发生了转移
-            3. 格式要求：数字序号 + 实心句号 + 原文内容（例如：1.我是名满京城的神秘画师）。
-            4. 节奏要求：保持短促、高频的切换感。
+    with st.expander("查看原始文本"):
+        st.text(content)
 
-            剧本原文如下：
-            {content}
-            """
-            
-            with st.spinner("AI 正在分析并生成分镜..."):
-                response = model.generate_content(prompt)
-                
-                if response.text:
-                    st.success("分镜处理完成！")
-                    st.text_area("处理结果预览", value=response.text, height=400)
+    if st.button("开始分镜处理"):
+        if not api_key:
+            st.error("请先在左侧输入 API Key！")
+        else:
+            with st.spinner("AI 正在深度分析并进行分镜切分，请稍后..."):
+                try:
+                    # 构造系统 Prompt
+                    system_prompt = """你是一位专业的漫剧分镜师。你的任务是将用户提供的原始文本拆分成适合漫剧制作的短分镜。
+                    核心规则：
+                    1. 分镜原则：每当角色说话切换、场景变换、或画面中动作发生改变时，必须另起一个序号。
+                    2. 零遗漏：必须包含原文的所有内容，不漏一个字。
+                    3. 零添加：严禁添加原文以外的描述词。
+                    4. 格式：数字序号+点（如 1. 2. ）。
+                    5. 顺序：严格保持原著顺序。"""
+
+                    headers = {
+                        "Authorization": f"Bearer {api_key}",
+                        "Content-Type": "application/json"
+                    }
                     
+                    payload = {
+                        "model": model_name,
+                        "messages": [
+                            {"role": "system", "content": system_prompt},
+                            {"role": "user", "content": f"请对以下内容进行分镜处理：\n\n{content}"}
+                        ],
+                        "temperature": 0.1 # 设置低随机性，保证严格遵循原文
+                    }
+
+                    response = requests.post(base_url, headers=headers, json=payload)
+                    response.raise_for_status()
+                    result = response.json()['choices'][0]['message']['content']
+
+                    st.success("分镜处理完成！")
+                    st.text_area("分镜结果输出", value=result, height=600)
+                    
+                    # 下载按钮
                     st.download_button(
-                        label="📥 下载处理后的分镜文件",
-                        data=response.text,
-                        file_name=f"processed_{uploaded_file.name}",
+                        label="下载分镜文件",
+                        data=result,
+                        file_name="分镜整理_output.txt",
                         mime="text/plain"
                     )
-                else:
-                    st.error("AI 未返回内容，请检查 API Key 是否有效。")
 
-        except Exception as e:
-            # 自动报错引导
-            error_msg = str(e)
-            if "not found" in error_msg:
-                st.error(f"模型找不到: {model_choice}。请尝试在侧边栏选择其他模型或联系管理员。")
-            else:
-                st.error(f"处理失败: {error_msg}")
-
-elif not api_key:
-    st.info("💡 请在左侧输入你的 Gemini API Key 以激活系统。")
-
+                except Exception as e:
+                    st.error(f"处理出错: {str(e)}")
