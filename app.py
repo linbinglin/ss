@@ -1,124 +1,95 @@
-<!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-    <meta charset="UTF-8">
-    <title>漫剧AI智能分镜系统</title>
-    <style>
-        body { font-family: sans-serif; background: #f4f7f6; padding: 20px; color: #333; }
-        .container { max-width: 1000px; margin: 0 auto; background: #fff; padding: 30px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
-        .config-section, .input-section { margin-bottom: 20px; border-bottom: 1px solid #eee; padding-bottom: 20px; }
-        label { display: block; margin-bottom: 8px; font-weight: bold; }
-        input, select, textarea { width: 100%; padding: 10px; margin-bottom: 15px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; }
-        button { background: #28a745; color: white; border: none; padding: 12px 25px; border-radius: 4px; cursor: pointer; font-size: 16px; }
-        button:hover { background: #218838; }
-        #output { white-space: pre-wrap; background: #272822; color: #f8f8f2; padding: 20px; border-radius: 4px; margin-top: 20px; min-height: 200px; }
-        .loading { color: #007bff; display: none; }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <h2>🎬 漫剧AI智能分镜系统</h2>
-        
-        <!-- 配置项 -->
-        <div class="config-section">
-            <label>API 接口地址</label>
-            <input type="text" id="apiUrl" value="https://blog.tuiwen.xyz/v1/chat/completions">
-            
-            <label>API Key</label>
-            <input type="password" id="apiKey" placeholder="输入你的 API Key">
-            
-            <label>选择模型名称 (Model ID)</label>
-            <select id="modelId">
-                <option value="deepseek-chat">DeepSeek-V3</option>
-                <option value="gpt-4o">GPT-4o</option>
-                <option value="claude-3-5-sonnet-20240620">Claude-3.5-Sonnet</option>
-                <option value="gemini-1.5-pro">Gemini 1.5 Pro</option>
-                <option value="doubao-pro-128k">豆包 Pro</option>
-            </select>
-        </div>
+import streamlit as st
+from openai import OpenAI
+import io
 
-        <!-- 输入项 -->
-        <div class="input-section">
-            <label>1. 上传文案文本 (.txt)</label>
-            <input type="file" id="fileInput" accept=".txt">
-            
-            <label>2. 人物设定 (描述角色外观、着装)</label>
-            <textarea id="characterInfo" rows="4" placeholder="例如：赵清月：清冷美人，银丝蝴蝶簪，白色绫罗纱衣..."></textarea>
-            
-            <button onclick="processScript()">开始分析生成分镜</button>
-            <span id="loadingMsg" class="loading">正在处理中，请稍候...</span>
-        </div>
+# --- 页面设置 ---
+st.set_page_config(page_title="漫剧AI智能分镜系统", layout="wide")
 
-        <!-- 输出展示 -->
-        <label>生成结果</label>
-        <div id="output">解析后的分镜将显示在这里...</div>
-    </div>
+st.title("🎬 漫剧AI智能分镜与提示词生成系统")
+st.markdown("""
+本系统支持：自动分镜、35字限制分割、人物一致性提示词生成、MJ+即梦AI描述词导出。
+""")
 
-    <script>
-        let uploadedText = "";
+# --- 侧边栏配置 ---
+st.sidebar.header("⚙️ API 配置")
+api_url = st.sidebar.text_input("接口地址", value="https://blog.tuiwen.xyz/v1")
+api_key = st.sidebar.text_input("API Key", type="password")
+model_options = ["deepseek-chat", "gpt-4o", "claude-3-5-sonnet", "gemini-1.5-pro", "grok-1", "doubao-pro-128k"]
+model_id = st.sidebar.selectbox("选择模型名称", model_options)
 
-        // 读取文件内容
-        document.getElementById('fileInput').addEventListener('change', function(e) {
-            const file = e.target.files[0];
-            if (!file) return;
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                uploadedText = e.target.result;
-            };
-            reader.readAsText(file);
-        });
+# --- 主界面输入 ---
+col1, col2 = st.columns([1, 1])
 
-        async function processScript() {
-            const apiUrl = document.getElementById('apiUrl').value;
-            const apiKey = document.getElementById('apiKey').value;
-            const modelId = document.getElementById('modelId').value;
-            const charInfo = document.getElementById('characterInfo').value;
-            const outputDiv = document.getElementById('output');
-            const loadingMsg = document.getElementById('loadingMsg');
+with col1:
+    st.header("1. 导入文案与角色")
+    uploaded_file = st.file_uploader("上传文案文本 (.txt)", type="txt")
+    character_desc = st.text_area("人物外观描述 (重要：用于人物一致性)", 
+                                  placeholder="例如：\n安妙衣：瘦弱女子，病态白皙，眉心一点红，凌乱的青丝，素色破旧棉袍。\n赵尘：冷酷王爷，束发金冠，黑色锦袍，腰佩金刀。",
+                                  height=200)
 
-            if (!uploadedText || !apiKey) {
-                alert("请先上传文件并输入API Key");
-                return;
-            }
+with col2:
+    st.header("2. 设定与操作")
+    ratio = st.selectbox("视频比例", ["9:16 (竖屏漫剧)", "16:9 (横屏)", "1:1"])
+    process_btn = st.button("🚀 开始分析并生成分镜提示词", use_container_width=True)
 
-            loadingMsg.style.display = "inline";
-            outputDiv.innerText = "AI 正在深度推理文案并生成提示词...";
+# --- 核心处理逻辑 ---
+if process_btn:
+    if not api_key or not uploaded_file:
+        st.error("请先输入 API Key 并上传文案文件。")
+    else:
+        # 读取文件内容
+        stringio = io.StringIO(uploaded_file.getvalue().decode("utf-8"))
+        raw_script = stringio.read()
 
-            // 系统提示词逻辑 (将在第二部分详细说明)
-            const systemPrompt = `你是一个专业的漫剧导演和Midjourney提示词专家。
-任务：将用户上传的文案进行二次分镜。
-严格要求：
-1. 字符限制：每个分镜的文案不能超过35个字。如果超过，必须拆分为多个分镜。
-2. 结构一致：严禁修改原文文字。
-3. 画面描述：描述场景、环境、人物外观（严格调用用户提供的人物设定）、灯光、视角（特写/中景/全景）。
-4. 视频生成：描述画面中的动态行为、镜头推拉摇移、神态变化。
-5. 比例：9:16。`;
+        # 初始化 OpenAI 客户端
+        client = OpenAI(api_key=api_key, base_url=api_url)
 
-            try {
-                const response = await fetch(apiUrl, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${apiKey}`
-                    },
-                    body: JSON.stringify({
-                        model: modelId,
-                        messages: [
-                            { role: "system", content: systemPrompt },
-                            { role: "user", content: `人物设定：\n${charInfo}\n\n待处理文案：\n${uploadedText}` }
-                        ],
-                        temperature: 0.7
-                    })
-                });
+        # 构造 System Prompt (你的核心大脑)
+        system_prompt = f"""
+        你是一个顶级的漫剧导演和AI提示词专家。
+        任务：对用户提供的文案进行[二次深度分镜]并生成[AI绘画和视频提示词]。
 
-                const data = await response.json();
-                outputDiv.innerText = data.choices[0].message.content;
-            } catch (error) {
-                outputDiv.innerText = "发生错误: " + error.message;
-            } finally {
-                loadingMsg.style.display = "none";
-            }
-        }
-    </script>
-</body>
-</html>
+        ### 严格执行规则：
+        1. **35字分割原则**：为了匹配5秒视频，每个分镜的文案严禁超过35个字。若原分镜内容过长，必须在不改变原意的情况下拆分为多个子分镜。
+        2. **原文完整性**：禁止修改、遗漏原文中的任何一个字。
+        3. **格式要求**：
+           ---
+           **[分镜编号]**
+           **文案内容**：(原文，不可修改)
+           **画面描述**：(用于Midjourney生成图片。包含：场景、环境细节、人物完整外观设定、构图视角、光影效果。注意：不要描述动作。)
+           **视频生成**：(用于即梦AI生成视频。包含：角色具体的动作轨迹、镜头语言、表情微动、5秒内的动态变化。)
+           ---
+
+        ### 角色一致性要求：
+        在每一组“画面描述”中，必须完整调用以下人物外观设定，严禁简化：
+        {character_desc}
+
+        ### 比例要求：
+        画面比例设定为 {ratio}。
+        """
+
+        try:
+            with st.spinner("AI 正在深度解析剧情并生成提示词，请稍候..."):
+                response = client.chat.completions.create(
+                    model=model_id,
+                    messages=[
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": f"请对以下文案进行处理：\n\n{raw_script}"}
+                    ],
+                    temperature=0.7
+                )
+                
+                result = response.choices[0].message.content
+                
+                st.header("✅ 生成结果")
+                st.markdown(result)
+                
+                # 提供下载选项
+                st.download_button("下载分镜脚本", result, file_name="storyboard_output.txt")
+                
+        except Exception as e:
+            st.error(f"处理失败: {str(e)}")
+
+# --- 底部页脚 ---
+st.markdown("---")
+st.caption("提示：请确保你的中转接口支持你选择的模型 ID。")
