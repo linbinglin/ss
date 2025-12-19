@@ -2,63 +2,72 @@ import streamlit as st
 import requests
 import json
 
-# 页面基础配置
-st.set_page_config(page_title="漫剧全流程分镜工具V3", layout="wide")
+# 页面基础设置
+st.set_page_config(page_title="漫剧原子级分镜系统", layout="wide")
 
-# --- 侧边栏：API 与模型配置 ---
-st.sidebar.header("🚀 核心 API 配置")
-api_base = st.sidebar.text_input("接口地址", value="https://blog.tuiwen.xyz/v1/chat/completions")
+# --- 侧边栏配置 ---
+st.sidebar.header("⚙️ 核心 API 与模型配置")
+api_base = st.sidebar.text_input("中转接口地址", value="https://blog.tuiwen.xyz/v1/chat/completions")
 api_key = st.sidebar.text_input("API Key", type="password")
 
-model_list = ["deepseek-chat", "gpt-4o", "claude-3-5-sonnet-20240620", "gemini-1.5-pro", "grok-1", "doubao-pro-4k", "自定义"]
-selected_model = st.sidebar.selectbox("选择模型", model_list)
+model_list = [
+    "gpt-4o", 
+    "deepseek-chat", 
+    "claude-3-5-sonnet-20240620", 
+    "gemini-1.5-pro", 
+    "grok-1", 
+    "doubao-pro-4k", 
+    "自定义"
+]
+selected_model = st.sidebar.selectbox("选择大模型", model_list)
 model_id = st.sidebar.text_input("手动输入 Model ID") if selected_model == "自定义" else selected_model
 
 # --- 主界面 ---
-st.title("🎬 漫剧全流程分镜处理系统")
+st.title("🎬 漫剧原子级分镜处理台")
 st.markdown("---")
 
-# 初始化 Session State
-if 'split_result' not in st.session_state:
-    st.session_state.split_result = ""
-if 'visual_results' not in st.session_state:
-    st.session_state.visual_results = []
+# 初始化状态
+if 'split_text' not in st.session_state:
+    st.session_state.split_text = ""
+if 'char_dict' not in st.session_state:
+    st.session_state.char_dict = ""
 
-# 定义 Tab
-tab1, tab2 = st.tabs(["📝 第一步：文案逻辑切分", "🎨 第二步：分批视觉描述词生成"])
+# 布局：分为“逻辑切分”和“批量描述”两个独立板块
+tab_split, tab_visual = st.tabs(["📌 第一步：原子级文案切分", "🎨 第二步：分批视觉提示词生成"])
 
-# --- Tab 1: 文案切分逻辑 ---
-with tab1:
-    st.subheader("文案自动切分 (35字/动作/对话原则)")
-    st.info("AI 将严格按照人物切换、动作改变及字数限制（35字内/5秒视频）进行切分，不漏一个字。")
+# --- 第一阶段：文案切分 ---
+with tab_split:
+    st.subheader("原子级文案切分")
+    st.warning("逻辑：AI 会分析动作行为、对话角色。字数超过 35 字必须强制物理切断。")
     
-    col_char, col_text = st.columns([1, 2])
-    with col_char:
-        char_desc = st.text_area("角色外观字典 (必填)", height=150, help="描述角色外观着装，用于第二步注入", 
-                                placeholder="赵尘：玄色长袍，腰间佩玉...\n安妙衣：白色辫子绫罗纱衣，银丝蝴蝶簪...")
-    with col_text:
-        uploaded_file = st.file_uploader("上传原文文本 (.txt)", type=['txt'])
-        input_raw = st.text_area("或者直接粘贴原文内容", height=250, placeholder="在此粘贴需要处理的故事原文...")
+    char_desc = st.text_area("1. 输入角色外观字典 (必填，供后续生成描述使用)", height=150, 
+                             placeholder="安妙衣：清冷美人，银丝蝴蝶簪，白色绫罗纱衣...")
+    
+    uploaded_file = st.file_uploader("2. 上传原文文本 (.txt)", type=['txt'])
+    input_text = st.text_area("或者直接在此粘贴原文内容", height=300)
 
-    if st.button("开始自动化切分分镜", type="primary"):
-        source_content = input_raw if input_raw else (uploaded_file.read().decode("utf-8") if uploaded_file else "")
+    if st.button("🔥 执行原子级暴力拆解分镜", type="primary"):
+        source_content = input_text if input_text else (uploaded_file.read().decode("utf-8") if uploaded_file else "")
         if not api_key or not source_content:
-            st.error("请确保填写了 API Key 和文案内容")
+            st.error("请填写 API Key 并输入文案")
         else:
-            with st.spinner("AI 正在执行深度切分逻辑（严格执行35字原则）..."):
-                split_prompt = """你是一个顶级漫剧编剧。
-                任务：将文案严格拆分为独立分镜。
+            with st.spinner("正在进行‘外科手术式’分镜切分..."):
+                # 原子级切分指令
+                split_prompt = """你是一个专业的漫剧分镜剪辑师。
+                你的任务是将长文案拆解为适合 9:16 短视频的“原子级”分镜。
                 
-                严格准则：
-                1. 对话切换必分：不同人说话必须是独立分镜。
-                2. 动作改变必分：如从“坐着”到“起身”，必须切分。
-                3. 场景转换必分。
-                4. 字数强制限制：文案每段字数控制在30-35字以内（对应5秒配音）。若原文一段话过长，必须从语义停顿处强制拆分为多个分镜。
-                5. 原文完整：严禁遗漏任何一个字，严禁修改任何原文词语，严禁添加描述词。
+                【核心准则 - 严禁妥协】：
+                1. 颗粒度：不要直接搬运段落！要寻找句子中的动作变化。
+                2. 动作切分：只要角色有动作起伏（如：推门、回头、冷哼、坐下）、对话交替、场景切换，必须切分为下一个序号。
+                3. 长度对齐（硬性指标）：每个分镜对应的文案严禁超过 35 个字（为了对齐5秒视频）。如果一句话太长，必须从逗号或逻辑断句处暴力拆开。
+                4. 完整性：不许漏掉原文任何一个字！不许自行添加描述词！
                 
-                输出格式范例：
-                1.原文内容...
-                2.原文内容...
+                【思考模式】：
+                - 扫描文本 -> 识别动作/对话 -> 检查字数 -> 执行切分。
+                
+                【输出格式】：
+                数字序号.原文内容
+                数字序号.原文内容
                 """
                 try:
                     headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
@@ -69,56 +78,55 @@ with tab1:
                     }
                     res = requests.post(api_base, headers=headers, json=data)
                     res.raise_for_status()
-                    st.session_state.split_result = res.json()['choices'][0]['message']['content']
-                    st.session_state.char_desc_stored = char_desc
-                    st.success("切分完成！请在下方核对并微调。")
+                    st.session_state.split_text = res.json()['choices'][0]['message']['content']
+                    st.session_state.char_dict = char_desc
+                    st.success("切分完成！请核对并手动微调。")
                 except Exception as e:
-                    st.error(f"切分失败: {e}")
+                    st.error(f"切分失败: {str(e)}")
 
-    # 显示并允许手动编辑切分结果
-    if st.session_state.split_result:
-        st.write("### 逻辑分镜预览 (可在此微调序号和内容)")
-        st.session_state.split_result = st.text_area("编辑分镜预览", value=st.session_state.split_result, height=400)
+    if st.session_state.split_text:
+        st.write("### 切分结果预览 (请确保每行文案简短且符合动作逻辑)")
+        st.session_state.split_text = st.text_area("手动微调区域 (确认无误后进入下一步)", 
+                                                 value=st.session_state.split_text, height=400)
 
-# --- Tab 2: 分批视觉描述生成 ---
-with tab2:
-    st.subheader("视觉提示词分批生成 (MJ图片 + 即梦视频)")
+# --- 第二阶段：视觉生成 ---
+with tab_visual:
+    st.subheader("视觉生成 (每批 20 组)")
     
-    if not st.session_state.split_result:
-        st.warning("请先在第一个标签页完成‘文案切分’。")
+    if not st.session_state.split_text:
+        st.info("请先在第一步完成文案切分。")
     else:
-        # 解析分镜列表
-        segments = [s.strip() for s in st.session_state.split_result.split('\n') if s.strip()]
-        total_count = len(segments)
-        st.write(f"检测到共 **{total_count}** 个分镜。")
+        # 解析已经切分好的列表
+        lines = [line.strip() for line in st.session_state.split_text.split('\n') if line.strip()]
+        total = len(lines)
         
-        col_set1, col_set2 = st.columns(2)
-        with col_set1:
-            batch_size = 20
-            max_batch = (total_count // batch_size) + (1 if total_count % batch_size > 0 else 0)
-            current_batch = st.number_input("选择处理批次 (每批20个分镜)", min_value=1, max_value=max_batch, step=1)
+        st.write(f"总分镜数：{total}")
         
-        start_idx = (current_batch - 1) * batch_size
-        end_idx = min(start_idx + batch_size, total_count)
+        batch_size = 20
+        max_batch = (total // batch_size) + (1 if total % batch_size > 0 else 0)
+        current_batch = st.number_input("批次选择", min_value=1, max_value=max_batch, step=1)
         
-        st.info(f"当前准备处理第 {start_idx + 1} 到 {end_idx} 组分镜。")
+        start = (current_batch - 1) * batch_size
+        end = min(start + batch_size, total)
+        current_lines = lines[start:end]
+        
+        st.info(f"当前处理：第 {start+1} 至 {end} 组分镜")
 
-        if st.button(f"开始生成视觉描述词 (批次 {current_batch})"):
-            batch_data = segments[start_idx:end_idx]
-            with st.spinner("注入角色外观字典，正在生成动静分离提示词..."):
-                visual_prompt = f"""你是一个视觉分镜专家。
-                任务：为给出的分镜文案生成 Midjourney(9:16) 画面和 即梦AI 视频描述。
+        if st.button(f"生成批次 {current_batch} 的视觉描述词"):
+            with st.spinner("正在注入角色字典，构思 MJ 与 即梦 描述..."):
+                visual_prompt = f"""你是一个电影分镜师和 AI 提示词专家。
                 
-                角色外观一致性字典：
-                {st.session_state.get('char_desc_stored', '')}
+                【角色外观一致性字典】：
+                {st.session_state.char_dict}
                 
-                规则：
-                1. 严禁漏掉原文中的任何字。
-                2. 【画面描述】：Midjourney专用。描述静态场景、光影、构图、人物外观细节、服装材质。**绝对不能包含任何动作动作词语（如跑、跳、哭）**。视角采用漫剧常用视角（如：中景、特写）。
-                3. 【视频生成】：即梦AI专用。基于画面描述，增加动态：动作起伏、神态变化、镜头推拉摇移。描述需体现故事感。
+                【任务】：
+                为分镜文案生成视觉描述。
+                1. 每一个序号分镜输出：原文、画面描述、视频生成。
+                2. 【画面描述】：Midjourney(9:16)专用。描述静态：场景、光影、人物外观着装细节。**禁止动作词**（禁止写跑、走、哭等）。
+                3. 【视频生成】：即梦AI专用。基于画面，加入动态：神态变化、肢体动作、镜头语言（推拉摇移）。
                 
-                输出格式示例：
-                [序号]
+                【格式要求】：
+                序号.
                 原文内容：...
                 画面描述：...
                 视频生成：...
@@ -130,22 +138,17 @@ with tab2:
                         "model": model_id,
                         "messages": [
                             {"role": "system", "content": visual_prompt},
-                            {"role": "user", "content": "\n".join(batch_data)}
+                            {"role": "user", "content": "\n".join(current_lines)}
                         ],
                         "temperature": 0.3
                     }
                     res = requests.post(api_base, headers=headers, json=data)
                     res.raise_for_status()
-                    batch_res = res.json()['choices'][0]['message']['content']
-                    st.session_state.current_visual_batch = batch_res
+                    st.session_state.visual_output = res.json()['choices'][0]['message']['content']
                 except Exception as e:
-                    st.error(f"描述生成失败: {e}")
+                    st.error(f"描述生成失败: {str(e)}")
 
-        # 显示批次生成结果
-        if 'current_visual_batch' in st.session_state:
-            st.write("---")
-            st.write(f"### 第 {current_batch} 批次处理结果")
-            st.text_area("生成的视觉提示词结果", value=st.session_state.current_visual_batch, height=500)
-            st.download_button(f"下载第 {current_batch} 批次分镜", 
-                             st.session_state.current_visual_batch, 
+        if 'visual_output' in st.session_state:
+            st.text_area("生成的提示词结果", value=st.session_state.visual_output, height=500)
+            st.download_button("📥 下载当前结果", st.session_state.visual_output, 
                              file_name=f"分镜描述_批次{current_batch}.txt")
