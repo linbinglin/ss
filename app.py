@@ -1,139 +1,124 @@
-import streamlit as st
-import requests
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>漫剧AI智能分镜系统</title>
+    <style>
+        body { font-family: sans-serif; background: #f4f7f6; padding: 20px; color: #333; }
+        .container { max-width: 1000px; margin: 0 auto; background: #fff; padding: 30px; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.1); }
+        .config-section, .input-section { margin-bottom: 20px; border-bottom: 1px solid #eee; padding-bottom: 20px; }
+        label { display: block; margin-bottom: 8px; font-weight: bold; }
+        input, select, textarea { width: 100%; padding: 10px; margin-bottom: 15px; border: 1px solid #ddd; border-radius: 4px; box-sizing: border-box; }
+        button { background: #28a745; color: white; border: none; padding: 12px 25px; border-radius: 4px; cursor: pointer; font-size: 16px; }
+        button:hover { background: #218838; }
+        #output { white-space: pre-wrap; background: #272822; color: #f8f8f2; padding: 20px; border-radius: 4px; margin-top: 20px; min-height: 200px; }
+        .loading { color: #007bff; display: none; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h2>🎬 漫剧AI智能分镜系统</h2>
+        
+        <!-- 配置项 -->
+        <div class="config-section">
+            <label>API 接口地址</label>
+            <input type="text" id="apiUrl" value="https://blog.tuiwen.xyz/v1/chat/completions">
+            
+            <label>API Key</label>
+            <input type="password" id="apiKey" placeholder="输入你的 API Key">
+            
+            <label>选择模型名称 (Model ID)</label>
+            <select id="modelId">
+                <option value="deepseek-chat">DeepSeek-V3</option>
+                <option value="gpt-4o">GPT-4o</option>
+                <option value="claude-3-5-sonnet-20240620">Claude-3.5-Sonnet</option>
+                <option value="gemini-1.5-pro">Gemini 1.5 Pro</option>
+                <option value="doubao-pro-128k">豆包 Pro</option>
+            </select>
+        </div>
 
-# --- 页面配置 ---
-st.set_page_config(page_title="漫剧导演分镜大师 v14.0", layout="wide", page_icon="🎬")
+        <!-- 输入项 -->
+        <div class="input-section">
+            <label>1. 上传文案文本 (.txt)</label>
+            <input type="file" id="fileInput" accept=".txt">
+            
+            <label>2. 人物设定 (描述角色外观、着装)</label>
+            <textarea id="characterInfo" rows="4" placeholder="例如：赵清月：清冷美人，银丝蝴蝶簪，白色绫罗纱衣..."></textarea>
+            
+            <button onclick="processScript()">开始分析生成分镜</button>
+            <span id="loadingMsg" class="loading">正在处理中，请稍候...</span>
+        </div>
 
-# --- 侧边栏配置 ---
-with st.sidebar:
-    st.header("⚙️ 导演工作室配置")
-    base_url = st.text_input("接口地址", value="https://blog.tuiwen.xyz/v1/chat/completions")
-    api_key = st.text_input("API Key", type="password")
-    
-    st.markdown("---")
-    model_options = ["gpt-4o", "claude-3-5-sonnet-20240620", "deepseek-chat", "grok-beta", "✨ 自定义 Model ID"]
-    selected_model = st.selectbox("选择逻辑驱动模型", options=model_options)
-    
-    if selected_model == "✨ 自定义 Model ID":
-        final_model_id = st.text_input("请输入具体的 Model ID (必填)")
-    else:
-        final_model_id = selected_model
+        <!-- 输出展示 -->
+        <label>生成结果</label>
+        <div id="output">解析后的分镜将显示在这里...</div>
+    </div>
 
-st.title("🎬 漫剧导演级分镜大师 v14.0")
-st.error("🚨 警告：严禁沿用原文段落！必须按【视觉瞬间】和【35字限制】重新独立分镜，严禁丢字！")
+    <script>
+        let uploadedText = "";
 
-# --- 第一阶段：粉碎性精细分镜 ---
-st.subheader("第一阶段：视觉原子化重构分镜（打破段落依赖）")
+        // 读取文件内容
+        document.getElementById('fileInput').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                uploadedText = e.target.result;
+            };
+            reader.readAsText(file);
+        });
 
-col_script, col_board = st.columns(2)
+        async function processScript() {
+            const apiUrl = document.getElementById('apiUrl').value;
+            const apiKey = document.getElementById('apiKey').value;
+            const modelId = document.getElementById('modelId').value;
+            const charInfo = document.getElementById('characterInfo').value;
+            const outputDiv = document.getElementById('output');
+            const loadingMsg = document.getElementById('loadingMsg');
 
-with col_script:
-    raw_script = st.text_area("1. 粘贴剧本原文", height=400, placeholder="在此输入剧本文案...")
-    
-    if st.button("🚀 开始灵魂分镜重构"):
-        if not api_key or not final_model_id:
-            st.error("请完善左侧 API 配置和模型 ID。")
-        elif not raw_script:
-            st.warning("内容为空。")
-        else:
-            with st.spinner("正在粉碎段落结构，基于视觉逻辑重新拉片..."):
-                # v14.0 极致指令：强制打破段落惯性
-                step1_prompt = """
-你现在是一个顶级的竖屏漫剧（9:16）分镜导演。
-你的任务是将提供的文案，按照【视觉原子】和【5秒音频步长】重新切割。
-
-【第一步：彻底粉碎结构】
-- 忽略原文的所有换行和分段。
-- 严禁直接按照原文的段落进行分镜。原文的段落划分是无参考价值的。
-
-【第二步：视觉原子化分镜逻辑】
-- **一镜一画**：一个分镜只能代表一个【静止的视觉瞬间】。
-- **动作拆分**：如果一句话里包含两个动作（如：他推门进来，又坐下了），必须拆分为两个分镜。一张 MJ 图画不出两个连续动作。
-- **对话拆分**：每一句不同角色的对白、甚至同一角色的长难句，必须独立成镜。
-- **35字物理红线**：每个分镜文案【绝对禁止超过 35 个汉字】（对应5秒音频）。哪怕是一句长对白，也必须在语气停顿处强行切开！
-
-【第三步：数据无损校验】
-- 你必须按照顺序提取原文的所有字符。
-- **严禁遗漏原文任何一个字，严禁修改原文结构，严禁添加任何描述词。**
-
-输出要求：
-仅输出序号和文案。例如：
-1.内容...
-2.内容...
-"""
-                payload = {
-                    "model": final_model_id,
-                    "messages": [
-                        {"role": "system", "content": step1_prompt},
-                        {"role": "user", "content": raw_script}
-                    ],
-                    "temperature": 0.0 # 强制零随机性，确保不丢字
-                }
-                try:
-                    res = requests.post(base_url, headers={"Authorization": f"Bearer {api_key}"}, json=payload, timeout=200)
-                    st.session_state['step1_res'] = res.json()['choices'][0]['message']['content']
-                except Exception as e:
-                    st.error(f"分镜规划失败：{str(e)}")
-
-with col_board:
-    final_script_v1 = st.text_area("2. 导演精修分镜（每一行应为一个独立的画面瞬间）", 
-                                  value=st.session_state.get('step1_res', ''), 
-                                  height=400)
-    st.caption("💡 提示：扫视右侧。如果某一行文案包含了“先做什么再做什么”，请手动回车切开。")
-
-st.markdown("---")
-
-# --- 第二阶段：视觉指令集生成 ---
-st.subheader("第二阶段：9:16 视觉语言转化（MJ + 即梦）")
-
-use_char = st.checkbox("固定角色/着装设定（防止人物跳戏）", value=True)
-char_detail = ""
-if use_char:
-    char_detail = st.text_area("输入核心人物外貌特征（Midjourney 一致性关键）", 
-                               placeholder="赵尘：冷酷男人，黑发束冠，玄色锦袍...\n安妙衣：肤白，步摇发饰，白色罗裙...", 
-                               height=150)
-
-if st.button("🎨 生成全套视觉提示词"):
-    if not final_script_v1:
-        st.error("请先完成第一阶段。")
-    else:
-        with st.spinner("正在构思 9:16 竖屏构图与 5 秒动态描述..."):
-            step2_prompt = f"""
-你是一名资深漫剧视觉总监。请为以下分镜生成 MJ 提示词和视频动态指令。
-
-【核心角色参考档案】：
-{char_detail}
-
-【视觉表现规范】：
-1. **画面描述 (MJ)**：
-   - 适配 9:16。描述静态画面（场景环境、角色设定词、景别视角、氛围）。
-   - **景别控制**：根据文案。台词用特写/中景；大动作或转场用全景。
-   - **禁止出现动词**，必须描述一个静止的“原子瞬间”。
-2. **视频生成 (即梦 AI)**：
-   - 描述基于静态图的 5 秒内动态。
-   - 包含：角色动作细节（如转头、垂眼）、镜头语言（推拉摇移）。
-   - 所有动态动作必须在 5 秒音频时间内能自然完成。
-
-输出格式：
-[序号]. [文案]
-画面描述：场景内容，[角色设定词]，[景别视角]，氛围描述词，--ar 9:16
-视频生成：具体动态动作描述，镜头运动轨迹，情绪节奏
-"""
-            payload = {
-                "model": final_model_id,
-                "messages": [
-                    {"role": "system", "content": step2_prompt},
-                    {"role": "user", "content": final_script_v1}
-                ],
-                "temperature": 0.4
+            if (!uploadedText || !apiKey) {
+                alert("请先上传文件并输入API Key");
+                return;
             }
-            try:
-                res = requests.post(base_url, headers={"Authorization": f"Bearer {api_key}"}, json=payload, timeout=300)
-                st.session_state['step2_res'] = res.json()['choices'][0]['message']['content']
-            except Exception as e:
-                st.error(f"提示词生成失败：{str(e)}")
 
-if 'step2_res' in st.session_state:
-    st.subheader("📋 最终导演分镜稿")
-    st.text_area("预览结果", st.session_state['step2_res'], height=600)
-    st.download_button("📥 下载完整分镜全案", st.session_state['step2_res'], file_name="漫剧分镜导演全案.txt")
+            loadingMsg.style.display = "inline";
+            outputDiv.innerText = "AI 正在深度推理文案并生成提示词...";
+
+            // 系统提示词逻辑 (将在第二部分详细说明)
+            const systemPrompt = `你是一个专业的漫剧导演和Midjourney提示词专家。
+任务：将用户上传的文案进行二次分镜。
+严格要求：
+1. 字符限制：每个分镜的文案不能超过35个字。如果超过，必须拆分为多个分镜。
+2. 结构一致：严禁修改原文文字。
+3. 画面描述：描述场景、环境、人物外观（严格调用用户提供的人物设定）、灯光、视角（特写/中景/全景）。
+4. 视频生成：描述画面中的动态行为、镜头推拉摇移、神态变化。
+5. 比例：9:16。`;
+
+            try {
+                const response = await fetch(apiUrl, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${apiKey}`
+                    },
+                    body: JSON.stringify({
+                        model: modelId,
+                        messages: [
+                            { role: "system", content: systemPrompt },
+                            { role: "user", content: `人物设定：\n${charInfo}\n\n待处理文案：\n${uploadedText}` }
+                        ],
+                        temperature: 0.7
+                    })
+                });
+
+                const data = await response.json();
+                outputDiv.innerText = data.choices[0].message.content;
+            } catch (error) {
+                outputDiv.innerText = "发生错误: " + error.message;
+            } finally {
+                loadingMsg.style.display = "none";
+            }
+        }
+    </script>
+</body>
+</html>
