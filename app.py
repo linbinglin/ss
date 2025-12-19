@@ -2,7 +2,7 @@ import streamlit as st
 import requests
 
 # --- 页面配置 ---
-st.set_page_config(page_title="漫剧导演全流程系统 v13.0", layout="wide", page_icon="🎬")
+st.set_page_config(page_title="漫剧导演分镜大师 v14.0", layout="wide", page_icon="🎬")
 
 # --- 侧边栏配置 ---
 with st.sidebar:
@@ -11,52 +11,55 @@ with st.sidebar:
     api_key = st.text_input("API Key", type="password")
     
     st.markdown("---")
-    model_options = ["gpt-4o", "claude-3-5-sonnet-20240620", "deepseek-chat", "✨ 自定义 Model ID"]
-    selected_model = st.selectbox("选择驱动模型", options=model_options)
+    model_options = ["gpt-4o", "claude-3-5-sonnet-20240620", "deepseek-chat", "grok-beta", "✨ 自定义 Model ID"]
+    selected_model = st.selectbox("选择逻辑驱动模型", options=model_options)
     
     if selected_model == "✨ 自定义 Model ID":
-        final_model_id = st.text_input("手动输入 Model ID")
+        final_model_id = st.text_input("请输入具体的 Model ID (必填)")
     else:
         final_model_id = selected_model
 
-st.title("🎬 漫剧导演级全流程分镜系统 v13.0")
-st.warning("💡 核心准则：文案理解为王，物理规则辅助。每一镜都必须是 9:16 比例下可实现的视觉原子。")
+st.title("🎬 漫剧导演级分镜大师 v14.0")
+st.error("🚨 警告：严禁沿用原文段落！必须按【视觉瞬间】和【35字限制】重新独立分镜，严禁丢字！")
 
-# --- 第一阶段：叙事驱动精细分镜 ---
-st.subheader("第一阶段：叙事驱动型分镜（脑内建模 + 无损切割）")
+# --- 第一阶段：粉碎性精细分镜 ---
+st.subheader("第一阶段：视觉原子化重构分镜（打破段落依赖）")
 
-col_left, col_right = st.columns(2)
+col_script, col_board = st.columns(2)
 
-with col_left:
-    raw_script = st.text_area("1. 粘贴剧本原文", height=400, placeholder="在此粘贴您的原始故事文本...")
+with col_script:
+    raw_script = st.text_area("1. 粘贴剧本原文", height=400, placeholder="在此输入剧本文案...")
     
-    if st.button("🚀 开始灵魂分镜规划"):
+    if st.button("🚀 开始灵魂分镜重构"):
         if not api_key or not final_model_id:
-            st.error("请完善配置。")
+            st.error("请完善左侧 API 配置和模型 ID。")
         elif not raw_script:
             st.warning("内容为空。")
         else:
-            with st.spinner("导演正在进行全篇视觉建模，分析动作与情感流..."):
-                # v13.0 深度导演 Prompt：回归叙事本质
+            with st.spinner("正在粉碎段落结构，基于视觉逻辑重新拉片..."):
+                # v14.0 极致指令：强制打破段落惯性
                 step1_prompt = """
-你是一名顶级漫剧剪辑导演。你的任务是根据文案内容，进行【二次视觉化精准分镜】。
+你现在是一个顶级的竖屏漫剧（9:16）分镜导演。
+你的任务是将提供的文案，按照【视觉原子】和【5秒音频步长】重新切割。
 
-【第一任务：叙事与画面理解（核心）】
-1. **脑内建模**：忽略原文的段落，认真阅读全文，在大脑中拉片。
-2. **定义视觉单元**：一个分镜应是一个独立的镜头（Shot）。当出现以下情况时，必须切换分镜：
-   - 视觉焦点转换（如：从看门外转到看对方的眼泪）。
-   - 动作的起止点（如：刚要抬手 -> 手落下）。
-   - 叙事节奏的呼吸感。
-3. **9:16 构图预判**：确保每一个分镜的内容在 9:16 竖屏比例下能够完美呈现。如果内容太多导致构图杂乱，必须拆分镜头。
+【第一步：彻底粉碎结构】
+- 忽略原文的所有换行和分段。
+- 严禁直接按照原文的段落进行分镜。原文的段落划分是无参考价值的。
 
-【第二任务：物理规则辅助（红线）】
-1. **时长适配**：考虑即梦AI生成的5秒限制。单镜文案建议控制在 15-35 字。
-2. **暴力限时**：如果一段叙事极其连贯但超过 35 字，你必须找到语义中的“气口”进行视觉过渡（如：从远景切特写），从而拆分成两个分镜。
+【第二步：视觉原子化分镜逻辑】
+- **一镜一画**：一个分镜只能代表一个【静止的视觉瞬间】。
+- **动作拆分**：如果一句话里包含两个动作（如：他推门进来，又坐下了），必须拆分为两个分镜。一张 MJ 图画不出两个连续动作。
+- **对话拆分**：每一句不同角色的对白、甚至同一角色的长难句，必须独立成镜。
+- **35字物理红线**：每个分镜文案【绝对禁止超过 35 个汉字】（对应5秒音频）。哪怕是一句长对白，也必须在语气停顿处强行切开！
 
-【第三任务：数据无损（底线）】
-- **严禁遗漏原文任何一个字，严禁修改任何标点或字词，严禁添加额外内容。** 
+【第三步：数据无损校验】
+- 你必须按照顺序提取原文的所有字符。
+- **严禁遗漏原文任何一个字，严禁修改原文结构，严禁添加任何描述词。**
 
-输出：仅输出序号.文案（例如：1.内容\n2.内容）。
+输出要求：
+仅输出序号和文案。例如：
+1.内容...
+2.内容...
 """
                 payload = {
                     "model": final_model_id,
@@ -64,57 +67,57 @@ with col_left:
                         {"role": "system", "content": step1_prompt},
                         {"role": "user", "content": raw_script}
                     ],
-                    "temperature": 0.3
+                    "temperature": 0.0 # 强制零随机性，确保不丢字
                 }
                 try:
                     res = requests.post(base_url, headers={"Authorization": f"Bearer {api_key}"}, json=payload, timeout=200)
                     st.session_state['step1_res'] = res.json()['choices'][0]['message']['content']
                 except Exception as e:
-                    st.error(f"分镜失败：{str(e)}")
+                    st.error(f"分镜规划失败：{str(e)}")
 
-with col_right:
-    final_script_v1 = st.text_area("2. 最终分镜稿（可手动微调）", 
+with col_board:
+    final_script_v1 = st.text_area("2. 导演精修分镜（每一行应为一个独立的画面瞬间）", 
                                   value=st.session_state.get('step1_res', ''), 
                                   height=400)
-    st.caption("检查建议：文案内容是否过长？一个镜头能否装下这个画面？是否丢字？")
+    st.caption("💡 提示：扫视右侧。如果某一行文案包含了“先做什么再做什么”，请手动回车切开。")
 
 st.markdown("---")
 
-# --- 第二阶段：视觉全案描述生成 ---
-st.subheader("第二阶段：分镜图 (MJ) 与视频 (即梦) 描述生成")
+# --- 第二阶段：视觉指令集生成 ---
+st.subheader("第二阶段：9:16 视觉语言转化（MJ + 即梦）")
 
-use_char = st.checkbox("注入角色外貌/着装一致性描述词", value=True)
-char_desc = ""
+use_char = st.checkbox("固定角色/着装设定（防止人物跳戏）", value=True)
+char_detail = ""
 if use_char:
-    char_desc = st.text_area("输入核心角色设定词（长相、服饰细节）", 
-                             placeholder="赵尘：冷峻男人，黑发束冠，玄色刺绣锦袍...\n安妙衣：肤白，银丝蝴蝶簪...", 
-                             height=150)
+    char_detail = st.text_area("输入核心人物外貌特征（Midjourney 一致性关键）", 
+                               placeholder="赵尘：冷酷男人，黑发束冠，玄色锦袍...\n安妙衣：肤白，步摇发饰，白色罗裙...", 
+                               height=150)
 
 if st.button("🎨 生成全套视觉提示词"):
     if not final_script_v1:
         st.error("请先完成第一阶段。")
     else:
-        with st.spinner("正在根据 9:16 视觉美学设计画面方案..."):
+        with st.spinner("正在构思 9:16 竖屏构图与 5 秒动态描述..."):
             step2_prompt = f"""
 你是一名资深漫剧视觉总监。请为以下分镜生成 MJ 提示词和视频动态指令。
 
-【核心角色参考】：
-{char_desc}
+【核心角色参考档案】：
+{char_detail}
 
-【视觉生成规范】：
+【视觉表现规范】：
 1. **画面描述 (MJ)**：
-   - 适配 9:16 比例。描述静态画面（场景、角色、景别、视角、氛围）。
-   - **景别选择**：根据文案情绪。大场面用全景，对话/心理用特写。
-   - 禁止描述动词动作。
+   - 适配 9:16。描述静态画面（场景环境、角色设定词、景别视角、氛围）。
+   - **景别控制**：根据文案。台词用特写/中景；大动作或转场用全景。
+   - **禁止出现动词**，必须描述一个静止的“原子瞬间”。
 2. **视频生成 (即梦 AI)**：
-   - 描述基于该画面的 5 秒内动态。
-   - 包含：角色微表情、身体微动、镜头推拉平移轨迹。
-   - 确保动态逻辑符合文案表达的情绪。
+   - 描述基于静态图的 5 秒内动态。
+   - 包含：角色动作细节（如转头、垂眼）、镜头语言（推拉摇移）。
+   - 所有动态动作必须在 5 秒音频时间内能自然完成。
 
 输出格式：
 [序号]. [文案]
-画面描述：[9:16 构图描述]，[固定角色设定]，[景别视角]，光影氛围，--ar 9:16
-视频生成：[动作描述]，[镜头运动轨迹]，情绪演变控制
+画面描述：场景内容，[角色设定词]，[景别视角]，氛围描述词，--ar 9:16
+视频生成：具体动态动作描述，镜头运动轨迹，情绪节奏
 """
             payload = {
                 "model": final_model_id,
@@ -131,5 +134,6 @@ if st.button("🎨 生成全套视觉提示词"):
                 st.error(f"提示词生成失败：{str(e)}")
 
 if 'step2_res' in st.session_state:
-    st.text_area("📋 导演最终全案稿", st.session_state['step2_res'], height=600)
-    st.download_button("📥 导出分镜导演稿", st.session_state['step2_res'], file_name="漫剧分镜导演稿.txt")
+    st.subheader("📋 最终导演分镜稿")
+    st.text_area("预览结果", st.session_state['step2_res'], height=600)
+    st.download_button("📥 下载完整分镜全案", st.session_state['step2_res'], file_name="漫剧分镜导演全案.txt")
