@@ -3,12 +3,12 @@ import requests
 import json
 
 # ==========================================
-# 核心函数定义 - 放在最上方确保调用安全
+# 核心函数定义
 # ==========================================
 
-def call_ai(provider, key, mid, prompt):
+def call_ai(provider, key, mid, base_url, prompt):
     """
-    全机型通用 AI 调用函数，修复了 Gemini 的认证 Header 问题
+    支持原生接口与第三方中转接口的通用调用函数
     """
     key = key.strip()
     
@@ -18,22 +18,31 @@ def call_ai(provider, key, mid, prompt):
         "ChatGPT": "gpt-4o",
         "Gemini": "gemini-1.5-pro",
         "Grok (xAI)": "grok-beta",
-        "豆包 (火山引擎)": ""
+        "豆包 (火山引擎)": "",
+        "第三方中转 (OpenAI格式)": "gpt-4o"
     }
     target_model = mid if mid else default_models.get(provider, "")
 
-    # 2. 供应商 URL 配置
-    urls = {
-        "DeepSeek": "https://api.deepseek.com/chat/completions",
-        "ChatGPT": "https://api.openai.com/v1/chat/completions",
-        "Gemini": "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
-        "Grok (xAI)": "https://api.x.ai/v1/chat/completions",
-        "豆包 (火山引擎)": "https://ark.cn-beijing.volces.com/api/v3/chat/completions"
-    }
-    url = urls.get(provider)
+    # 2. 供应商 URL 逻辑
+    if provider == "第三方中转 (OpenAI格式)":
+        # 如果用户提供了中转地址，确保路径正确
+        if not base_url:
+            return "错误：使用第三方中转必须填写 API Base URL。"
+        # 自动补全路径
+        url = base_url.rstrip('/')
+        if not url.endswith('/chat/completions'):
+            url += '/chat/completions'
+    else:
+        urls = {
+            "DeepSeek": "https://api.deepseek.com/chat/completions",
+            "ChatGPT": "https://api.openai.com/v1/chat/completions",
+            "Gemini": "https://generativelanguage.googleapis.com/v1beta/openai/chat/completions",
+            "Grok (xAI)": "https://api.x.ai/v1/chat/completions",
+            "豆包 (火山引擎)": "https://ark.cn-beijing.volces.com/api/v3/chat/completions"
+        }
+        url = urls.get(provider)
 
-    # 3. 认证 Header 修复 (关键修复点)
-    # 无论哪个供应商，统一加上 Authorization Bearer，Gemini 现在也支持并可能强制要求这个
+    # 3. 认证 Header (兼容模式)
     headers = {
         "Content-Type": "application/json",
         "Authorization": f"Bearer {key}"
@@ -43,17 +52,19 @@ def call_ai(provider, key, mid, prompt):
     payload = {
         "model": target_model,
         "messages": [
-            {
-                "role": "system", 
-                "content": "你是一位拥有10年经验的漫剧导演，擅长将文字转化为极其精确的视觉分镜，并能完美控制文案时长以适配视频。"
-            },
+            {"role": "system", "content": "你是一位专业的漫剧分镜导演，擅长精准切分文案并注入丰富的视觉细节。"},
             {"role": "user", "content": prompt}
         ],
-        "temperature": 0.2 # 降低随机性以保证指令执行
+        "temperature": 0.2
     }
     
     try:
-        response = requests.post(url, headers=headers, json=payload, timeout=120)
+        # Gemini 特殊处理：有时需要在 URL 挂 Key
+        final_url = url
+        if provider == "Gemini" and "key=" not in url:
+            final_url = f"{url}?key={key}"
+
+        response = requests.post(final_url, headers=headers, json=payload, timeout=120)
         
         if response.status_code != 200:
             return f"API 错误 ({response.status_code}): {response.text}"
@@ -64,96 +75,87 @@ def call_ai(provider, key, mid, prompt):
         return f"请求异常: {str(e)}"
 
 # ==========================================
-# Streamlit 界面布局
+# Streamlit 界面
 # ==========================================
 
-st.set_page_config(page_title="漫剧自动化分镜工作站 v2.2", layout="wide")
+st.set_page_config(page_title="漫剧全流程工作站 v2.3", layout="wide")
 
-# 初始化 Session State
 if 'step1_result' not in st.session_state:
     st.session_state.step1_result = ""
 
-# --- 侧边栏：配置区 ---
+# --- 侧边栏 ---
 with st.sidebar:
     st.header("⚙️ 第一步：API 配置")
-    provider = st.selectbox("选择大模型", ["DeepSeek", "ChatGPT", "Gemini", "Grok (xAI)", "豆包 (火山引擎)"])
+    provider = st.selectbox("选择大模型/供应商", 
+                            ["第三方中转 (OpenAI格式)", "DeepSeek", "ChatGPT", "Gemini", "Grok (xAI)", "豆包 (火山引擎)"])
+    
+    # 针对第三方中转的地址输入
+    custom_base = ""
+    if provider == "第三方中转 (OpenAI格式)":
+        custom_base = st.text_input("API Base URL", value="https://blog.tuiwen.xyz/v1", help="请填入中转站的API根地址")
+    
     api_key = st.text_input("输入 API Key", type="password")
-    model_id = st.text_input("自定义 Model ID / Endpoint ID", help="Gemini 留空默认 1.5-pro，豆包必填")
+    model_id = st.text_input("自定义 Model ID", placeholder="如: gpt-4o, deepseek-v3", help="必填：中转接口支持的模型名称")
     
     st.divider()
     st.header("👤 第二步：人物设定库")
-    st.markdown("在此录入所有角色的详细外貌、着装。系统将自动完整提取。")
-    char_setup = st.text_area("人物角色详细描述", height=350, 
-                               placeholder="安妙衣（女主）：清丽绝伦的美人，眉眼柔弱...素雅纱衣\n赵尘（男主）：俊美霸道男子，五官深邃...")
+    char_setup = st.text_area("人物角色详细描述", height=300, 
+                               placeholder="在此粘贴人物.txt的内容...")
 
 # --- 主界面 ---
-st.title("🎬 漫剧全流程自动化分镜工作站")
+st.title("🎬 漫剧自动化分镜与视觉生成工作站")
 
-tab1, tab2 = st.tabs(["第一步：35字精准拆分文案", "第二步：视觉指令生成"])
+tab1, tab2 = st.tabs(["第一步：35字精准拆分", "第二步：注入角色并生成视觉脚本"])
 
-# --- 第一阶段逻辑 ---
+# 第一阶段
 with tab1:
-    st.subheader("1. 剧本文案精确分镜处理")
-    st.markdown("""
-    **处理目标：**
-    1. 确保每一段文案在 **35字以内**（对齐5秒音频）。
-    2. 只要有 **动作改变**、**角色切换**、**场景改变**，必须拆分为独立分镜。
-    """)
+    st.subheader("1. 精确分镜拆分")
+    st.info("AI 将确保每段文案 < 35字，并根据动作/对话切换分镜。")
+    raw_script = st.text_area("输入原始剧情文本", height=250)
     
-    raw_script = st.text_area("输入原始剧本/文案", height=300, placeholder="粘贴需要转换的全文...")
-    
-    if st.button("开始拆分分镜"):
-        if not api_key:
-            st.warning("请在侧边栏填入 API Key")
+    if st.button("开始拆分"):
+        if not api_key: st.warning("请输入 API Key")
         else:
-            prompt_split = f"""
-            你是一个分镜剪辑师。请处理以下文案。
+            prompt_split = f"""请将以下文案切分为分镜序号。
             规则：
-            1. 每一行文案必须在 35 个字以内。如果原句长，拆分为 a/b 序号。
-            2. 只要涉及对话切换、人物动作切换、场景切换，必须拆为新的序号。
-            3. 不得遗漏、添加或修改原文中的任何一个字。
-            4. 输出格式：序号. [文案内容]
+            1. 每行文案严格控制在 35 字以内。
+            2. 对话切换、动作大变、场景转换必须拆分。
+            3. 严禁修改或遗漏原文任何字。
+            4. 格式：序号. [文案内容]
             
-            待处理文案：
-            {raw_script}
-            """
-            with st.spinner("正在进行 35字/动作 深度拆分..."):
-                result = call_ai(provider, api_key, model_id, prompt_split)
-                st.session_state.step1_result = result
-                st.success("拆分完成！")
-
-    st.session_state.step1_result = st.text_area("分镜拆分预览（请在此核对文案顺序和字数）：", 
-                                               value=st.session_state.step1_result, height=400)
-
-# --- 第二阶段逻辑 ---
-with tab2:
-    st.subheader("2. 自动注入人物描述并合成指令")
+            文案如下：
+            {raw_script}"""
+            with st.spinner("正在拆分..."):
+                st.session_state.step1_result = call_ai(provider, api_key, model_id, custom_base, prompt_split)
     
-    if st.button("生成 MJ + 即梦 AI 指令"):
+    st.session_state.step1_result = st.text_area("拆分结果（可微调）", value=st.session_state.step1_result, height=350)
+
+# 第二阶段
+with tab2:
+    st.subheader("2. 生成视觉指令 (MJ + 即梦)")
+    if st.button("生成视觉脚本"):
         if not st.session_state.step1_result or not char_setup:
-            st.error("请确保‘第一步’已有结果，且侧边栏已填写‘人物设定’！")
+            st.error("请确保已完成第一步且已填写人物设定！")
         else:
             prompt_visual = f"""
-            你是一位漫剧导演。请为以下分镜列表生成视觉指令。
+            任务：为分镜生成视觉指令。
             
             【人物设定库】：
             {char_setup}
             
-            【待处理分镜列表】：
+            【分镜列表】：
             {st.session_state.step1_result}
             
             【输出规范】：
-            1. 每一个分镜必须包含以下三部分：
-               序号. [原文案对比]
-               画面描述：(描述当前场景、景别。必须从【人物设定库】中提取对应人物的【完整外貌和着装描述】，不得简化，必须包含所有细节，如发饰、衣服颜色、质感等)。
-               视频生成：(描述该5秒内的动态动作、神态变化、镜头运动语言。例如：镜头特写，某某某神色惊恐，眼角流泪)。
-            2. 逻辑：画面描述写“静止时的样子”，视频生成写“动起来的样子”。
-            3. 确保所有描述紧贴【原文案对比】的内容。
+            每一组必须包含：
+            序号. [原文案对比]
+            画面描述：(描述场景、景别。必须完整提取【人物设定库】中的对应角色外貌描述，不得简化)。
+            视频生成：(描述5秒内的动态动作、神态、镜头运动)。
             
-            请开始生成全部分镜的指令：
+            *注意：画面描述是静态的，视频生成描述动态。*
             """
-            with st.spinner("正在注入人物一致性细节并分析动态场景..."):
-                final_output = call_ai(provider, api_key, model_id, prompt_visual)
+            with st.spinner("正在注入人物细节并分析场景..."):
+                final_output = call_ai(provider, api_key, model_id, custom_base, prompt_visual)
                 st.write("---")
                 st.markdown(final_output)
-                st.download_button("下载完整分镜脚本", final_output, file_name="storyboard_final.txt")
+                st.download_button("下载完整脚本", final_output, file_name="storyboard.txt")
