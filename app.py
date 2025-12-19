@@ -13,8 +13,8 @@ with st.sidebar:
     api_key = st.text_input("输入 Gemini API Key:", type="password")
     # 使用更准确的模型 ID
     model_choice = st.selectbox("选择模型", [
-        "gemini-1.5-flash", 
-        "gemini-1.5-pro",
+        "gemini-1.5-flash-latest", 
+        "gemini-1.5-pro-latest",
         "gemini-2.0-flash-exp" # 备选最新实验版
     ])
     st.markdown("---")
@@ -77,3 +77,4 @@ if uploaded_file and api_key:
 
 elif not api_key:
     st.info("💡 请在左侧输入你的 Gemini API Key 以激活系统。")
+
