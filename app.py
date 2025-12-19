@@ -35,10 +35,10 @@ def call_ai(provider, key, mid, base_url, prompt):
     payload = {
         "model": target_model,
         "messages": [
-            {"role": "system", "content": "你是一位分镜剪辑大师，追求一镜一画的极致视觉表达。"},
+            {"role": "system", "content": "你是一位专业的漫剧导演，擅长平衡分镜的视觉美感与制作效率。"},
             {"role": "user", "content": prompt}
         ],
-        "temperature": 0.1 # 极低随机性确保严格执行拆分规则
+        "temperature": 0.3 
     }
     
     try:
@@ -54,120 +54,124 @@ def call_ai(provider, key, mid, base_url, prompt):
 # 界面布局
 # ==========================================
 
-st.set_page_config(page_title="漫剧原子分镜站 v2.9", layout="wide")
+st.set_page_config(page_title="漫剧导演工作站 v3.0", layout="wide")
 
 if 'step1_list' not in st.session_state: st.session_state.step1_list = []
 if 'current_index' not in st.session_state: st.session_state.current_index = 0
 if 'accumulated_storyboard' not in st.session_state: st.session_state.accumulated_storyboard = ""
 
 with st.sidebar:
-    st.header("⚙️ 引擎配置")
-    provider = st.selectbox("API 供应商", ["第三方中转 (OpenAI格式)", "DeepSeek", "ChatGPT", "Gemini", "Grok (xAI)", "豆包 (火山引擎)"])
+    st.header("⚙️ 1. API 引擎配置")
+    provider = st.selectbox("选择供应商", ["第三方中转 (OpenAI格式)", "DeepSeek", "ChatGPT", "Gemini", "Grok (xAI)", "豆包 (火山引擎)"])
     custom_base = st.text_input("API Base URL", value="https://blog.tuiwen.xyz/v1") if provider == "第三方中转 (OpenAI格式)" else ""
     api_key = st.text_input("API Key", type="password")
     model_id = st.text_input("Model ID", value="gpt-4o")
     
     st.divider()
-    st.header("👤 人物角色库")
-    char_setup = st.text_area("角色详细描述词", height=300, placeholder="姓名：(描述词)...")
+    st.header("👤 2. 核心角色库")
+    char_setup = st.text_area("粘贴人物详细描述 (姓名：(描述))", height=300, placeholder="姓名：(描述词)...")
     
-    if st.button("🔴 重置进度"):
+    if st.button("🔴 重置项目进度"):
         st.session_state.current_index = 0
         st.session_state.accumulated_storyboard = ""
         st.session_state.step1_list = []
         st.rerun()
 
-st.title("🎬 漫剧原子分镜工作站 - 一镜一画版")
+st.title("🎬 漫剧全流程分镜工作站 v3.0")
 
-tab1, tab2 = st.tabs(["第一步：原子化分镜拆解", "第二步：高一致性视觉指令"])
+tab1, tab2 = st.tabs(["第一步：视觉节奏分镜", "第二步：分段视觉指令生成"])
 
-# --- 第一步：极致拆分 ---
+# --- 第一步：视觉节奏分镜 ---
 with tab1:
-    st.subheader("🖋️ 剧本逻辑原子拆分")
+    st.subheader("🖋️ 剧本分镜切分")
     st.markdown("""
-    **拆分金律：**
-    1. **一镜一画**：每一个分镜只描述一个核心动作或画面。
-    2. **动作必拆**：即便文案短，只要包含连续动作（如：走过去、坐下），必须拆为两个分镜。
-    3. **对话必拆**：角色对话切换时，必须换镜。
-    4. **画面过载必拆**：如果一句话描述了太多视觉内容，必须拆分成多组。
-    5. **5秒原则**：单镜文案绝对禁止超过 35 字。
+    **分镜逻辑：**
+    1. **视觉完整性**：将一个能在5秒内通过一张底图+动态表达清楚的【意群】合为一个分镜。
+    2. **5秒准则**：单镜文案字数严格控制在 **35字以内**。
+    3. **换镜信号**：换人说话、场景大跳跃、或发生了无法在同一画面表达的剧烈动作。
+    4. **连贯性**：确保分镜之间像电影剪辑一样流畅，不破碎。
     """)
-    raw_script = st.text_area("输入原始文本", height=250)
+    raw_script = st.text_area("输入原始剧本文案", height=250)
     
-    if st.button("执行原子化拆分"):
+    if st.button("执行分镜切分"):
         prompt_split = f"""
-        你是一位顶级分镜导演。请将以下剧本进行【原子化拆分】。
+        你是一位漫剧导演。请将以下剧本拆分为适合制作的分镜。
         
         【规则】：
-        1. 一个分镜对应一个独立的画面。
-        2. 遇到以下情况必须拆分为下一镜：
-           - 场景切换
-           - 角色对话切换
-           - 人物动作改变（即便在同一句文案里）
-           - 镜头焦点从人物A转移到人物B
-        3. 如果一段文案内容太多，一个静态画面展现不全，请根据逻辑将其重新拆分为两组或多组分镜，并将文案合理分配。
-        4. 严禁遗漏原文任何一个字，严禁添加内容。
-        5. 每一组文案不得超过35个字。
+        1. 合理分镜：将一个视觉连贯的场景或动作意群合为一个分镜，不要拆得太碎。
+        2. 时长对齐：每段文案字数绝对禁止超过 35 个字（对应5秒视频）。
+        3. 动作与对话：角色对话切换、或场景大幅度改变时，必须另起分镜。
+        4. 零遗漏：包含原文所有字。
         
         【输出格式】：
-        序号. [原文案]
+        序号. [文案内容]
         
         待处理剧本：
         {raw_script}
         """
-        with st.spinner("导演正在进行原子化解析..."):
+        with st.spinner("导演正在构思分镜节奏..."):
             result = call_ai(provider, api_key, model_id, custom_base, prompt_split)
             lines = result.split('\n')
             st.session_state.step1_list = [l.strip() for l in lines if re.match(r"^\d+[\.．、\s]", l.strip())]
-            st.success(f"拆分完成！已生成 {len(st.session_state.step1_list)} 个原子分镜。")
+            st.success(f"分镜切分完成！共计 {len(st.session_state.step1_list)} 镜。")
 
     if st.session_state.step1_list:
-        st.text_area("原子分镜预览", value="\n".join(st.session_state.step1_list), height=300)
+        st.text_area("预览分镜文案", value="\n".join(st.session_state.step1_list), height=300)
 
-# --- 第二步：精准生成 ---
+# --- 第二步：分段描述生成 ---
 with tab2:
-    st.subheader("🖼️ 视觉描述与视频生成")
+    st.subheader("🖼️ 视觉描述与视频动态")
     
     if not st.session_state.step1_list:
-        st.info("请先在第一步完成拆分。")
+        st.info("请先完成第一步分镜切分。")
     else:
         curr = st.session_state.current_index
         total = len(st.session_state.step1_list)
         st.progress(curr / total)
-        st.write(f"📊 进度：{curr} / {total}")
+        st.write(f"📊 制作进度：{curr} / {total} 镜")
         
-        batch_size = st.number_input("每次生成数量", 1, 50, 20)
+        batch_size = st.number_input("本批次生成数量", 1, 50, 20)
         
         if curr < total:
-            if st.button(f"🚀 生成下 {batch_size} 组视觉描述"):
+            if st.button(f"🚀 生成接下来的 {batch_size} 组指令"):
                 end = min(curr + batch_size, total)
                 target = "\n".join(st.session_state.step1_list[curr:end])
                 
                 prompt_visual = f"""
-                任务：为原子化分镜生成视觉描述。
+                任务：为漫剧分镜生成视觉指令。
                 
-                【人物库】：
+                【核心人物库】：
                 {char_setup}
                 
-                【分镜列表】：
+                【当前分镜列表】：
                 {target}
                 
-                【输出要求】：
+                【输出规范】：
                 1. 格式严格如下：
-                   序号. [原文案]
-                   画面描述：描述所在场景、景别、视角。人物必须以“姓名(完整描述)”格式呈现。
-                   视频生成：根据原文案描述角色的动态动作、神态情绪、镜头语言。
+                   序号. [原文案对比]
+                   画面描述：[描述所在具体场景、景别、视角]，姓名(完整角色设定词)... [静态构图与光影氛围]。
+                   视频生成：[结合文案描述该5秒内的动态变化、角色神态、动作、镜头语言]。
                 
-                2. 人物注入：每个角色必须带括号()完整描述。
-                3. 场景固定：每一组都要明确描述当前场景。
+                2. 人物一致性：必须在角色名后紧跟括号内的【完整描述词】，严禁简化。
+                3. 一镜一画：每一组必须清晰描述该分镜所在的场景背景。
+                
+                【参考案例】：
+                1. [我拉过灵曦的手 转身离开]
+                画面描述：京城繁华街角，特写镜头，(赵清月，清冷美人...)正紧紧拉着(赵灵曦，明艳张扬...)的手。
+                视频生成：两人转身，白色衣角与黄色裙摆交错，镜头跟随两人移动，路人纷纷退开。
                 """
-                with st.spinner("生成中..."):
+                with st.spinner(f"正在生成第 {curr+1} 至 {end} 镜..."):
                     batch_res = call_ai(provider, api_key, model_id, custom_base, prompt_visual)
-                    st.session_state.accumulated_storyboard += "\n\n" + batch_res
-                    st.session_state.current_index = end
-                    st.rerun()
+                    if "API ERROR" not in batch_res:
+                        st.session_state.accumulated_storyboard += "\n\n" + batch_res
+                        st.session_state.current_index = end
+                        st.rerun() # 确保界面即时刷新
+                    else:
+                        st.error(batch_res)
+        else:
+            st.success("全部生成完成！")
         
         if st.session_state.accumulated_storyboard:
             st.divider()
-            st.text_area("全量结果", value=st.session_state.accumulated_storyboard, height=400)
-            st.download_button("下载结果", st.session_state.accumulated_storyboard, file_name="Storyboard.txt")
+            st.text_area("已生成的视觉脚本汇总", value=st.session_state.accumulated_storyboard, height=450)
+            st.download_button("💾 下载脚本文件", st.session_state.accumulated_storyboard, file_name="Manga_Drama_Storyboard.txt")
