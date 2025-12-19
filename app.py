@@ -4,7 +4,7 @@ import json
 import re
 
 # ==========================================
-# 核心函数：AI 调用逻辑
+# 核心函数：电影导演思维分镜与视觉生成
 # ==========================================
 
 def call_ai(provider, key, mid, base_url, prompt):
@@ -34,133 +34,153 @@ def call_ai(provider, key, mid, base_url, prompt):
     headers = {"Content-Type": "application/json", "Authorization": f"Bearer {key}"}
     payload = {
         "model": target_model,
-        "messages": [{"role": "system", "content": "你是一位漫剧导演，请严格按照格式输出。不要说任何废话。"}, {"role": "user", "content": prompt}],
-        "temperature": 0.2
+        "messages": [
+            {"role": "system", "content": "你是一位拥有顶级导演思维的漫剧分镜师。你擅长逐字理解文案逻辑，并将文案转化为极具故事感、电影感的画面脚本。"},
+            {"role": "user", "content": prompt}
+        ],
+        "temperature": 0.3 # 稍微提高一点创造力以增强故事感，但保持格式稳定
     }
     
     try:
         final_url = f"{url}?key={key}" if provider == "Gemini" and "key=" not in url else url
-        response = requests.post(final_url, headers=headers, json=payload, timeout=120)
+        response = requests.post(final_url, headers=headers, json=payload, timeout=240)
         if response.status_code != 200:
-            return f"API 错误: {response.text}"
+            return f"API 出错: {response.text}"
         return response.json()['choices'][0]['message']['content']
     except Exception as e:
-        return f"请求异常: {str(e)}"
+        return f"系统连接异常: {str(e)}"
 
 # ==========================================
 # 界面布局与状态管理
 # ==========================================
 
-st.set_page_config(page_title="漫剧大师 v2.7 - 鲁棒性修复版", layout="wide")
+st.set_page_config(page_title="漫剧导演工作站 v2.8", layout="wide")
 
+# 初始化 Session 状态，防止刷新丢失数据
 if 'step1_list' not in st.session_state: st.session_state.step1_list = []
 if 'current_index' not in st.session_state: st.session_state.current_index = 0
 if 'accumulated_storyboard' not in st.session_state: st.session_state.accumulated_storyboard = ""
 
 # --- 侧边栏 ---
 with st.sidebar:
-    st.header("⚙️ 1. API 引擎")
-    provider = st.selectbox("选择供应商", ["第三方中转 (OpenAI格式)", "DeepSeek", "ChatGPT", "Gemini", "Grok (xAI)", "豆包 (火山引擎)"])
+    st.header("⚙️ 引擎配置")
+    provider = st.selectbox("API 供应商", ["第三方中转 (OpenAI格式)", "DeepSeek", "ChatGPT", "Gemini", "Grok (xAI)", "豆包 (火山引擎)"])
     custom_base = st.text_input("API Base URL", value="https://blog.tuiwen.xyz/v1") if provider == "第三方中转 (OpenAI格式)" else ""
     api_key = st.text_input("API Key", type="password")
     model_id = st.text_input("Model ID", value="gpt-4o")
     
     st.divider()
-    st.header("👤 2. 人物设定库")
-    char_setup = st.text_area("人物设定 (姓名：(描述))", height=300)
+    st.header("👤 核心角色描述库")
+    char_setup = st.text_area("人物设定 (格式：姓名：(描述词))", height=350, placeholder="安妙衣：(清丽绝伦...)\n赵尘：(深邃冷峻...)")
     
-    if st.button("🔴 重置进度"):
+    if st.button("🔴 重置所有流程"):
         st.session_state.current_index = 0
         st.session_state.accumulated_storyboard = ""
         st.session_state.step1_list = []
         st.rerun()
 
 # --- 主界面 ---
-st.title("🎬 漫剧大师 v2.7")
+st.title("🎬 漫剧全流程分镜站 - 导演思维版")
 
-tab1, tab2 = st.tabs(["第一步：逻辑分镜拆分", "第二步：分段生成视觉脚本"])
+tab1, tab2 = st.tabs(["第一步：电影导演分镜切分", "第二步：视觉描述指令生成"])
 
-# --- 第一步：逻辑切分修复版 ---
+# --- 第一步：逻辑切分逻辑 ---
 with tab1:
-    st.subheader("🖋️ 剧本逻辑拆分")
-    raw_script = st.text_area("输入原始剧本", height=250)
+    st.subheader("🖋️ 剧本逻辑深度拆解")
+    raw_script = st.text_area("在此输入剧本原文", height=300)
     
-    if st.button("开始分镜拆分"):
-        prompt_split = f"""
-        任务：将剧本拆分为适合漫剧的分镜。
-        
-        要求：
-        1. 每一个分镜文案严格禁止超过 35 个汉字。
-        2. 同场景、连贯动作请合并。
-        3. 对话切换、大动作必须拆分。
-        4. 禁止遗漏原文任何字。
-        5. 格式要求：序号. [文案内容]
-           例如：
-           1. [我是名满京城的神秘画师，一笔一划皆能勾动男子情欲。]
-           2. [世间女子骂我伤风败俗，可男人们却视若珍宝。]
-        
-        待处理剧本：
-        {raw_script}
-        """
-        with st.spinner("AI 正在思考逻辑分镜..."):
-            result = call_ai(provider, api_key, model_id, custom_base, prompt_split)
+    if st.button("执行导演分镜"):
+        if not api_key: st.error("请先填入 API Key")
+        else:
+            prompt_split = f"""
+            你是一个优秀的电影解说导演，请对以下文本进行分镜。
             
-            # 优化解析逻辑：使用正则表达式匹配 "数字. [内容]" 或 "数字、[内容]"
-            lines = result.split('\n')
-            new_list = []
-            for line in lines:
-                line = line.strip()
-                if re.match(r"^\d+[\.．、\s]", line): # 匹配数字开头后接标点或空格
-                    new_list.append(line)
+            【导演任务】：
+            1. 逐字逐句理解文本中的内容，然后对文本进行分段处理。
+            2. 逻辑原则：每个角色对话切换、场景切换、动作画面改变，都需要设定为下一个分镜。
+            3. 禁止修改原文：不可遗漏、改变原文故事结构，严禁添加原文以外内容。
+            4. 连贯流畅：不要一句话一个分镜，而是根据剧情来划分，让分镜连贯流畅。
+            5. 时长控制：由于文案要配音，单镜头限制在5秒内（约35个汉字）。如果剧情连贯但字数超过35字，必须在逻辑转折点切分。
             
-            if not new_list:
-                st.error("解析失败！AI 返回的内容格式不正确。请查看下方 AI 的原始回复并尝试重新生成。")
-                with st.expander("查看 AI 原始回复"):
+            【格式要求】：
+            仅输出序号列表，格式为：序号. [文案内容]
+            
+            待处理文案：
+            {raw_script}
+            """
+            with st.spinner("导演正在逐句研读剧本并划分分镜..."):
+                result = call_ai(provider, api_key, model_id, custom_base, prompt_split)
+                
+                # 增强的正则表达式提取逻辑
+                lines = result.split('\n')
+                st.session_state.step1_list = [l.strip() for l in lines if re.match(r"^\d+[\.．、\s]", l.strip())]
+                
+                if not st.session_state.step1_list:
+                    st.error("未能识别分镜，请检查 AI 返回结果。")
                     st.code(result)
-            else:
-                st.session_state.step1_list = new_list
-                st.session_state.current_index = 0
-                st.success(f"成功拆分出 {len(new_list)} 个分镜！")
+                else:
+                    st.success(f"分镜划分成功！共计 {len(st.session_state.step1_list)} 组。")
+                    st.session_state.current_index = 0
 
     if st.session_state.step1_list:
-        st.text_area("当前分镜预览", value="\n".join(st.session_state.step1_list), height=300)
+        st.text_area("分镜预览 (可手动修改文案)", value="\n".join(st.session_state.step1_list), height=300)
 
-# --- 第二步：分段生成视觉指令 ---
+# --- 第二步：视觉生成逻辑 ---
 with tab2:
-    st.subheader("🖼️ 视觉指令生成 (断点控制)")
+    st.subheader("🖼️ 画面描述与视频生成 (逐镜注入)")
     
     if not st.session_state.step1_list:
-        st.info("请先在‘第一步’完成拆分。")
+        st.info("请先完成第一步分镜拆分。")
     else:
-        current = st.session_state.current_index
+        curr = st.session_state.current_index
         total = len(st.session_state.step1_list)
-        st.progress(current / total)
-        st.write(f"📊 进度：{current} / {total}")
+        st.progress(curr / total)
+        st.write(f"📊 进度：{curr} / {total}")
 
-        batch_size = st.number_input("每次生成数量", 1, 50, 20)
+        col1, col2 = st.columns(2)
+        with col1:
+            batch_size = st.number_input("每次生成分镜数", 1, 50, 20)
         
-        if current < total:
-            if st.button(f"🚀 生成接下来的 {batch_size} 组"):
-                end = min(current + batch_size, total)
-                batch_data = "\n".join(st.session_state.step1_list[current:end])
+        if curr < total:
+            if st.button(f"🚀 生成下 {batch_size} 组视觉脚本"):
+                end = min(curr + batch_size, total)
+                target_data = "\n".join(st.session_state.step1_list[curr:end])
                 
                 prompt_visual = f"""
-                任务：为以下分镜生成视觉脚本。
+                你是一位漫剧视觉导演。请为以下分镜生成对应的 Midjourney 画面描述 和 即梦视频生成指令。
                 
-                【人物设定】：
+                【核心人物设定】：
                 {char_setup}
                 
-                【本批次分镜】：
-                {batch_data}
+                【待处理分镜】：
+                {target_data}
                 
-                【输出格式】：
-                序号. [原文案对比]
-                画面描述：[场景、景别、视角]，姓名(完整描述)，姓名(完整描述)... [静态构图与光影]
-                视频生成：[动态动作与表情变化]，[镜头运动语言]
+                【生成规则 (严格执行)】：
+                1. 每一个分镜必须包含且仅包含以下三部分：
+                   序号. [原文案对照]
+                   画面描述：描述所在场景、景别(特写/全景)、视角。如果出现人物，必须使用(姓名+完整设定)的形式，例如：(安妙衣，清丽绝伦的美人...)。
+                   视频生成：根据文案描述画面中角色的动态动作、神态变化、镜头语言。
+                2. 人物描述：必须用括号()扩上角色设定词。当分镜出现多个角色时，每个角色都要独立带括号描述。
+                3. 一致性：每个分镜必须描述所在场景，确保视觉连贯。
                 
-                注意：人物描述词必须用()扩起来。每一组必须包含原文案对照。
+                【案例参考】：
+                1. [我拉过灵曦的手 转身离开]
+                画面描述：京城街角，(赵清月，清冷美人，眉眼极精致...)拉着(赵灵曦，明艳张扬，杏眼桃腮...)的手。
+                视频生成：白衣女人牵着黄衣女人的手转向一边，镜头跟随两人移动，路人虚化。
                 """
                 
-                with st.spinner("正在生成描述词..."):
+                with st.spinner(f"正在生成第 {curr+1} 到 {end} 镜..."):
                     batch_res = call_ai(provider, api_key, model_id, custom_base, prompt_visual)
-                    st.session_state.accumulated_storyboard += "\n\n" + batch_res
+                    if "API 出错" not in batch_res:
+                        st.session_state.accumulated_storyboard += "\n\n" + batch_res
+                        st.session_state.current_index = end
+                        st.rerun() # 强制刷新以显示最新结果
+                    else:
+                        st.error(batch_res)
+        else:
+            st.success("✅ 全剧分镜视觉描述已全部出炉！")
+
+        if st.session_state.accumulated_storyboard:
+            st.divider()
+            st.text_area("全量视觉脚本汇总", value=st.session_state.accumulated_storyboard, height=500)
+            st.download_button("💾 下载脚本文件", st.session_state.accumulated_storyboard, file_name="Storyboard_Production.txt")
