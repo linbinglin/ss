@@ -1,69 +1,67 @@
 import streamlit as st
 import requests
-import json
 
 # --- 页面配置 ---
-st.set_page_config(page_title="漫剧专业导演分镜系统", layout="wide", page_icon="🎬")
+st.set_page_config(page_title="漫剧导演分镜系统 v3.0", layout="wide", page_icon="🎬")
 
-# 侧边栏配置
+# 侧边栏
 with st.sidebar:
     st.header("⚙️ 导演配置中心")
     base_url = st.text_input("接口地址", value="https://blog.tuiwen.xyz/v1/chat/completions")
     api_key = st.text_input("API Key", type="password")
-    model_list = ["gpt-4o", "claude-3-5-sonnet-20240620", "deepseek-chat", "✨ 自定义 Model ID"]
-    selected_option = st.selectbox("选择模型", options=model_list)
-    final_model_id = st.text_input("输入 Model ID", value="") if selected_option == "✨ 自定义 Model ID" else selected_option
+    selected_model = st.selectbox("选择模型", ["gpt-4o", "claude-3-5-sonnet-20240620", "deepseek-chat"])
     
-    st.markdown("---")
-    st.info("""
-    **分镜逻辑优化：**
-    1. **杜绝零碎**：不再机械地按行分镜。
-    2. **两遍推理**：先构思全局画面感，再进行物理切割。
-    3. **9:16 适配**：分镜内容必须能在竖屏内承载。
-    """)
+    st.error("🚨 硬性规则：单镜头文案上限 35 字（约 5 秒音频）。")
 
-st.title("🎬 漫剧专业导演分镜系统")
+st.title("🎬 漫剧全流程导演分镜系统")
+st.caption("第一阶段：文本精分（35字硬限） | 第二阶段：描述词生成（MJ+即梦）")
 
-# --- 第一阶段：导演级精细分镜 ---
-st.subheader("第一步：双重推理精细分镜（确定节奏与时长）")
+# --- 第一阶段：精细分镜 ---
+st.subheader("第一步：双重推理精细分镜（文本拆解层）")
 
 col_script, col_result = st.columns(2)
 
 with col_script:
-    raw_script = st.text_area("请粘贴原始剧本文案", height=400, placeholder="在此输入原始文案...")
+    raw_script = st.text_area("请粘贴原始文案", height=400)
     
-    if st.button("🚀 执行导演级分镜规划"):
+    if st.button("🚀 执行二次精准分镜（强制35字上限）"):
         if not api_key or not raw_script:
-            st.error("请完善配置并输入文案。")
+            st.error("请完善配置。")
         else:
-            with st.spinner("正在进行双重推理：全局构思 + 精准切割..."):
-                # 强化版第一阶段 Prompt
+            with st.spinner("正在进行严格的时长与节奏推理..."):
+                # 第一阶段 Prompt：重点在于“字数警察”逻辑
                 step1_prompt = """
-你是一个拥有10年经验的漫剧导演，专门负责 9:16 竖屏短剧的分镜规划。
-任务：将用户文案处理成最适合【漫剧出图】和【5秒视频生成】的分镜脚本。
+你是一个极其严苛的漫剧分镜师。你的任务是对文案进行【二次精准分镜】。
+你必须严格遵守以下【死命令】，否则分镜将无法使用：
 
-【执行流程：双重推理】
-第一遍（全局构思）：阅读全文，分析故事的起承转合。确定哪些动作是连贯的（可以合并为一个画面），哪些是情绪转折（必须拆分）。
-第二遍（精准切割）：在保证视觉连贯的基础上，严格执行“35字/5秒”物理限制。
+【核心限制：35字生死线】
+1. **强制拆分**：任何一个分镜的文案内容【绝对不能超过 35 个汉字】。
+2. **处理逻辑**：
+   - 如果一句话超过 35 字，必须在标点符号处拆分。
+   - 如果一句话中间没有标点但超过 35 字，必须强行进行逻辑断句拆分。
+   - 一个分镜通常对应 3-5 秒的视频，请确保语速与画面匹配。
 
-【分镜准则 - 严禁零碎】：
-1. 严禁按行分割。如果连续三行文案都在描述同一个细微动作且总字数 < 35字，必须合并为一个分镜，以保证出图的稳定。
-2. 严禁添加、遗漏、修改原文任何一个字。必须100%还原原文。
-3. 9:16 竖屏逻辑：考虑竖屏构图。如果文案涉及多人大场面，请在分镜时构思好如何通过局部或特写来呈现。
-4. 拆分触发点：只有当“角色切换”、“物理场景变动”、“时间大幅跳跃”或“单镜文案超过35字”时才允许拆分。
+【全局分镜逻辑：双重推理】
+1. **第一遍推理**：阅读全文，识别剧情高潮、转场和情绪点。
+2. **第二遍推理**：在保证 35 字上限的前提下，合并意境相同的短句。
+   - 严禁零碎：如果连续两三行极短的内容（如“他走了。”“推开门。”“停住了。”）总和小于 35 字，且属于同一个画面动作，请合并为一个分镜。
 
-【输出要求】：
-仅输出分镜编号和文案内容，格式如下：
-1.分镜内容...
-2.分镜内容...
+【原则】
+- 严禁遗漏原文任何一个字，严禁修改原文。
+- 严禁添加任何描述词。
+- 仅输出序号和文案。
+
+输出格式示例：
+1.文案内容（确保此处小于35字）
+2.文案内容（确保此处小于35字）
 """
                 payload = {
-                    "model": final_model_id,
+                    "model": selected_model,
                     "messages": [
                         {"role": "system", "content": step1_prompt},
                         {"role": "user", "content": raw_script}
                     ],
-                    "temperature": 0.2
+                    "temperature": 0.0 # 强制降低随机性
                 }
                 try:
                     res = requests.post(base_url, headers={"Authorization": f"Bearer {api_key}"}, json=payload)
@@ -72,51 +70,50 @@ with col_script:
                     st.error(f"分镜失败: {str(e)}")
 
 with col_result:
-    step1_final = st.text_area("导演分镜建议（可在此手动微调合并/拆分）", 
+    # 这里增加一个字数实时检测功能（模拟）
+    step1_final = st.text_area("分镜结果预览（请检查字数是否超标）", 
                                 value=st.session_state.get('step1_output', ''), 
                                 height=400)
-    st.caption("检查建议：确认每个分镜是否能在一张 9:16 的图中表达，且读完文案在 5 秒内。")
+    if step1_final:
+        st.info("💡 建议：如果看到某一行文字特别长，请手动敲回车并补上序号。")
 
 st.markdown("---")
 
-# --- 第二阶段：双重描述生成 ---
+# --- 第二阶段：描述生成 ---
 st.subheader("第二步：画面 (MJ) 与视频 (即梦) 描述生成")
 
-use_char = st.checkbox("启用【核心角色一致性】设定", value=True)
+use_char = st.checkbox("是否加入角色/着装参考", value=True)
 char_detail = ""
 if use_char:
-    char_detail = st.text_area("输入角色外貌/着装细节", 
-                               placeholder="赵尘：冷酷男人，黑发束冠，玄色刺绣锦袍...\n安妙衣：肤白如雪，步摇发饰，白色绫罗裙...",
-                               height=150)
+    char_detail = st.text_area("输入角色详细特征（长相、发饰、衣服）", height=150, placeholder="例如：赵尘，玄色锦袍...安妙衣，银丝蝴蝶坠珠簪...")
 
-if st.button("🎨 生成 MJ 提示词 + 视频动态指令"):
+if st.button("🎨 生成全套描述词"):
     if not step1_final:
-        st.error("请先完成第一步分镜。")
+        st.error("请先完成第一步。")
     else:
-        with st.spinner("正在根据 9:16 构思画面与动态..."):
+        with st.spinner("正在构建 9:16 视觉方案..."):
             step2_prompt = f"""
-你是一个漫剧原画师和视觉特效师。请根据分镜内容生成 Midjourney 绘画提示词和即梦 AI 视频动态指令。
+你是一个漫剧原画导演。请为每一个分镜生成适配 9:16 比例的 MJ 提示词和即梦 AI 视频指令。
 
-【角色一致性参考】：
+【角色一致性核心设定】：
 {char_detail}
 
-【视觉生成规范】：
-1. 【画面描述 (MJ)】：
-   - 适配 9:16。必须描述：景别（特写/中景）、视角（平视/俯视）、具体的场景环境、光影氛围。
-   - 角色描述：必须严格引用提供的【角色参考】，确保长相和衣服在每一镜中固定。
-   - 静态化：只描述样子，不描述动作。
-2. 【视频生成 (即梦)】：
-   - 必须基于“画面描述”的静态内容。
-   - 描述动态：如“人物眼眶发红，缓慢转过头”、“镜头从脚部向上平移”、“长发随风飘动”。
-   - 时间感知：所有动作必须在 5 秒内完成。
+【生成指南】：
+1. **画面描述 (Midjourney)**：
+   - 必须包含：9:16 比例、固定场景描述、固定的角色外貌着装、特定景别（特写/中景）、光影氛围。
+   - **禁止出现任何动词**，只描述静态。
+2. **视频生成 (即梦 AI)**：
+   - 必须描述：基于画面的动态演变（如：角色眼神从哀伤变为愤怒、裙摆飘动、手缓缓抬起）。
+   - 镜头语言：推拉、摇移、跟拍。
+   - **时间控制**：所有动态必须能在 5 秒内完美呈现。
 
 【输出格式】：
-[序号]. [文案内容]
-画面描述：场景描述，人物外表着装，景别视角，氛围，--ar 9:16
-视频生成：动作行为描述，镜头运动指令，情绪流向
+序号. [分镜文案内容]
+画面描述：场景内容，[角色设定词]，[景别视角]，氛围描述，--ar 9:16
+视频生成：动态行为描述，镜头运动指令，情绪节奏控制
 """
             payload = {
-                "model": final_model_id,
+                "model": selected_model,
                 "messages": [
                     {"role": "system", "content": step2_prompt},
                     {"role": "user", "content": step1_final}
@@ -127,8 +124,8 @@ if st.button("🎨 生成 MJ 提示词 + 视频动态指令"):
                 res = requests.post(base_url, headers={"Authorization": f"Bearer {api_key}"}, json=payload)
                 st.session_state['step2_output'] = res.json()['choices'][0]['message']['content']
             except Exception as e:
-                st.error(f"描述生成失败: {str(e)}")
+                st.error(f"生成失败: {str(e)}")
 
 if 'step2_output' in st.session_state:
     st.text_area("最终分镜表结果", st.session_state['step2_output'], height=500)
-    st.download_button("📥 导出分镜文案", st.session_state['step2_output'], file_name="漫剧脚本_最终版.txt")
+    st.download_button("📥 导出分镜文件", st.session_state['step2_output'], file_name="精准分镜脚本.txt")
