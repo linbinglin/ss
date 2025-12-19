@@ -2,147 +2,148 @@ import streamlit as st
 import requests
 import json
 
-# --- 页面设置 ---
-st.set_page_config(page_title="智能文案分镜助手 Pro", layout="wide", page_icon="🎬")
+# --- 页面配置 ---
+st.set_page_config(page_title="漫剧导演级分镜大师", layout="wide", page_icon="🎬")
 
-# 自定义 CSS 样式
+# 自定义 CSS
 st.markdown("""
     <style>
-    .main { background-color: #f5f7f9; }
-    .stButton>button { width: 100%; border-radius: 5px; height: 3em; background-color: #FF4B4B; color: white; font-weight: bold; }
-    .sidebar .sidebar-content { background-image: linear-gradient(#2e7bcf,#2e7bcf); color: white; }
+    .stTextArea textarea { font-size: 14px !important; }
+    .status-box { padding: 10px; border-radius: 5px; background-color: #f0f2f6; border-left: 5px solid #FF4B4B; }
     </style>
     """, unsafe_allow_html=True)
 
-st.title("🎬 智能文案分镜自动处理应用")
-st.caption("基于大语言模型，自动按对话、场景、动作拆分分镜，严禁删改原文。")
+st.title("🎬 漫剧导演级分镜自动处理系统")
+st.caption("集成：精准分镜拆解 | 角色一致性控制 | MJ 提示词 | 即梦视频动态指令")
 
 # --- 侧边栏：配置区 ---
 with st.sidebar:
-    st.header("⚙️ 设置中心")
+    st.header("⚙️ 全局配置")
+    base_url = st.text_input("接口地址", value="https://blog.tuiwen.xyz/v1/chat/completions")
+    api_key = st.text_input("API Key", type="password")
     
-    # 1. API 接口地址
-    base_url = st.text_input("接口地址 (Base URL)", value="https://blog.tuiwen.xyz/v1/chat/completions")
-    
-    # 2. API Key
-    api_key = st.text_input("API Key (令牌)", type="password")
-
-    st.markdown("---")
-    
-    # 3. 模型选择逻辑（整合自定义选项）
     st.subheader("🤖 模型选择")
-    model_list = [
-        "gpt-4o", 
-        "claude-3-5-sonnet-20240620", 
-        "deepseek-chat", 
-        "gemini-1.5-pro", 
-        "grok-beta", 
-        "doubao-pro-128k",
-        "✨ 自定义 Model ID"
-    ]
+    model_list = ["gpt-4o", "claude-3-5-sonnet-20240620", "grok-beta", "✨ 自定义 Model ID"]
+    selected_option = st.selectbox("选择模型", options=model_list)
     
-    selected_option = st.selectbox("选择或手动输入模型", options=model_list)
-    
-    # 如果选择了自定义，则显示输入框
     if selected_option == "✨ 自定义 Model ID":
-        final_model_id = st.text_input("请输入准确的 Model ID", value="", placeholder="例如: gpt-4-turbo")
-        st.info("💡 请从中转站后台复制准确的模型名称")
+        final_model_id = st.text_input("手动输入 Model ID", value="")
     else:
         final_model_id = selected_option
 
     st.markdown("---")
-    st.caption("分镜规则：角色对话切换、物理场景切换、人物动作改变时自动分段。")
+    st.warning("""
+    **分镜准则：**
+    1. 画面比例 9:16。
+    2. 文案限长：每个分镜 < 35字（约5秒）。
+    3. 逻辑：初拆 -> 全文推理 -> 精拆与合并。
+    """)
 
-# --- 主界面：内容区 ---
-col_left, col_right = st.columns([1, 1])
+# --- 主界面：数据导入 ---
+col_file1, col_file2 = st.columns(2)
 
-with col_left:
-    st.subheader("📝 导入原文内容")
-    uploaded_file = st.file_uploader("上传 .txt 文案文件", type=["txt"])
-    
-    raw_text = ""
-    if uploaded_file:
-        content = uploaded_file.read()
-        # 尝试常用编码进行解码
-        for encoding in ['utf-8', 'gbk', 'gb2312']:
+with col_file1:
+    st.subheader("1. 导入剧本文案")
+    story_file = st.file_uploader("上传文案 (.txt)", type=["txt"], key="story")
+    story_text = ""
+    if story_file:
+        story_text = story_file.read().decode("utf-8", errors="ignore")
+        st.text_area("文案预览", story_text, height=200)
+
+with col_file2:
+    st.subheader("2. 导入角色设定")
+    char_file = st.file_uploader("上传角色外表/着装描述 (.txt)", type=["txt"], key="char")
+    char_text = ""
+    if char_file:
+        char_text = char_file.read().decode("utf-8", errors="ignore")
+        st.text_area("角色参考预览", char_text, height=200)
+
+# --- 核心逻辑处理 ---
+if st.button("🚀 开始二次精准分镜处理"):
+    if not api_key or not final_model_id:
+        st.error("请完善左侧配置信息。")
+    elif not story_text or not char_text:
+        st.error("请同时上传文案和角色设定文件。")
+    else:
+        with st.spinner("导演正在进行二次推理与分镜规划中..."):
+            
+            # --- 深度导演 Prompt ---
+            system_instruction = f"""
+你是一个顶级的漫剧导演和分镜师。你的目标是根据用户提供的【角色设定】和【文案】，生成适配 9:16 比例、Midjourney 绘画、即梦 AI 视频生成的精准分镜表。
+
+### 角色参考资料：
+{char_text}
+
+### 执行步骤与核心逻辑：
+1. **二次推理逻辑**：
+   - 第一遍：初步阅读全文，理解剧情起伏、情绪转折。
+   - 第二遍：精准拆分。每个分镜文案严格控制在 35 个字符以内（确保音频时长不超过5秒）。
+   - 如果某段文案内容太少（如仅1-5字）且画面意境连贯，则将其与前后合并。
+   - 如果某句文案超过35字或动作过于复杂，必须拆分为多个分镜。
+
+2. **画面与视频描述分离原则**：
+   - **画面描述（MJ 提示词）**：仅描述静态元素。包含场景环境、天气光影、人物外表（严格引用角色参考）、着装、神态、视角（仰拍/俯拍/特写）、景别（远景/中景/近景）。【禁止描述动作行为】。
+   - **视频生成（即梦/Luma描述）**：在画面基础上描述动态。包含人物的具体动作、镜头语言（平移、推拉、跟拍）、情绪演变。【必须基于静态画面进行扩展】。
+
+3. **视觉一致性要求**：
+   - 每一屏必须描述当前场景（如：京城街角、破旧柴房），确保场景不跳跃。
+   - 每一个分镜必须固定人物外表和着装描述，直接从角色参考资料中提取关键词。
+
+### 输出格式要求：
+[序号]. [当前分镜完整文案]
+画面描述：[描述环境、固定的人物外表着装、景别、视角、氛围、9:16比例暗示]
+视频生成：[描述镜头运动轨迹、人物动作、情绪变化、5秒内的动态流向]
+
+---
+开始处理以下文案：
+{story_text}
+"""
+
+            payload = {
+                "model": final_model_id,
+                "messages": [
+                    {"role": "system", "content": system_instruction},
+                    {"role": "user", "content": "请开始进行二次精准分镜，确保每段文案在35字以内，并生成详细的MJ与视频描述。"}
+                ],
+                "temperature": 0.3,
+                "stream": False
+            }
+
+            headers = {
+                "Authorization": f"Bearer {api_key}",
+                "Content-Type": "application/json"
+            }
+
             try:
-                raw_text = content.decode(encoding)
-                break
-            except:
-                continue
-        st.text_area("内容预览", raw_text, height=450)
-
-with col_right:
-    st.subheader("🎥 自动分镜结果")
-    
-    if st.button("🚀 开始生成分镜"):
-        if not api_key:
-            st.error("请先输入 API Key")
-        elif not final_model_id:
-            st.error("请选择或输入 Model ID")
-        elif not raw_text:
-            st.warning("请上传文案内容")
-        else:
-            with st.spinner(f"正在调用 {final_model_id} 分析中..."):
-                
-                # --- 严格的分镜指令 ---
-                system_instruction = """你是一个极其严谨的文案分镜助手。
-任务：将用户提供的文案进行分段编号（分镜处理）。
-分段准则：
-1. 对话切换：不同角色的对话必须分开。
-2. 场景切换：地点、环境发生改变时必须分开。
-3. 动作改变：人物有显著的新动作或画面重心偏移时必须分开。
-
-输出要求：
-1. 必须保留原文中的【每一个字】，严禁精简、严禁修改错别字、严禁润色。
-2. 每一个分镜必须以数字序号+点开头（例如: 1.内容）。
-3. 严禁添加任何原文以外的描述性文字（如画面说明、旁白、内心戏等）。
-4. 严禁有任何开场白或结束语，直接输出带序号的全文内容。"""
-
-                payload = {
-                    "model": final_model_id,
-                    "messages": [
-                        {"role": "system", "content": system_instruction},
-                        {"role": "user", "content": f"请对以下全文进行分镜处理，不得遗漏任何字：\n\n{raw_text}"}
-                    ],
-                    "temperature": 0,  # 确保稳定性，不乱改
-                    "stream": False
-                }
-
-                headers = {
-                    "Authorization": f"Bearer {api_key}",
-                    "Content-Type": "application/json"
-                }
-
-                try:
-                    response = requests.post(base_url, headers=headers, json=payload, timeout=200)
+                response = requests.post(base_url, headers=headers, json=payload, timeout=300)
+                if response.status_code == 200:
+                    data = response.json()
+                    final_result = data['choices'][0]['message']['content']
                     
-                    if response.status_code == 200:
-                        data = response.json()
-                        if 'choices' in data:
-                            final_result = data['choices'][0]['message']['content']
-                            st.success("分析完成！")
-                            st.text_area("分镜脚本", final_result, height=450)
-                            
-                            st.download_button(
-                                label="📥 下载分镜脚本",
-                                data=final_result,
-                                file_name=f"分镜_{final_model_id}.txt",
-                                mime="text/plain"
-                            )
-                        else:
-                            st.error(f"解析失败：{data}")
-                    elif response.status_code == 503:
-                        st.error("Error 503: 模型未就绪或 ID 错误")
-                        st.code(response.text, language="json")
-                        st.info("💡 请确认『Model ID』是否与中转站后台一致。")
-                    else:
-                        st.error(f"接口返回错误 (Code: {response.status_code})")
-                        st.code(response.text, language="json")
+                    st.success("分镜规划完成！")
+                    st.subheader("🎥 最终分镜脚本")
+                    st.text_area("结果输出", final_result, height=600)
+                    
+                    st.download_button(
+                        label="📥 下载分镜脚本",
+                        data=final_result,
+                        file_name="精准分镜结果.txt",
+                        mime="text/plain"
+                    )
+                else:
+                    st.error(f"接口返回错误: {response.text}")
+            except Exception as e:
+                st.error(f"发生异常: {str(e)}")
 
-                except Exception as e:
-                    st.error(f"运行出错: {str(e)}")
-
-# --- 底部 ---
+# --- 底部操作指南 ---
 st.markdown("---")
-st.center = st.caption("提示：长文案建议使用 GPT-4o 或 Claude 3.5 以获得最精准的逻辑切分。")
+with st.expander("🛠️ 使用指南（必读）"):
+    st.write("""
+    1. **角色设定文件格式建议**：
+       例如：`赵尘：20岁男人，冷酷王爷，黑发束冠，身穿玄色锦袍，绣金线。`
+    2. **为什么要二次推理？**：
+       第一次推理确定大纲，第二次推理通过字数（35字准则）确定分镜的物理长度，防止音频与视频时长不对位。
+    3. **画面与视频的区别**：
+       - **画面** 是给 Midjourney 用的，决定了画质和角色样子。
+       - **视频** 是给即梦 AI 用的，决定了画面里的王爷是“走过去”还是“转过头”。
+    """)
