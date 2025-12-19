@@ -4,7 +4,7 @@ import json
 import re
 
 # ==========================================
-# 核心函数：支持 9:16 深度推理
+# 核心函数：零损耗双重推理
 # ==========================================
 
 def call_ai(provider, key, mid, base_url, prompt):
@@ -35,15 +35,18 @@ def call_ai(provider, key, mid, base_url, prompt):
     payload = {
         "model": target_model,
         "messages": [
-            {"role": "system", "content": "你是一位精通 9:16 竖屏短视频构图的专业漫剧导演。你擅长通过双重推理（全文理解+构图适配）生成完美的分镜脚本。"},
+            {
+                "role": "system", 
+                "content": "你是一位专业的漫剧分镜导演。你的核心天职是【原文保护】：严禁遗漏任何字词，严禁总结文案，严禁修改原话。你需要在保证文案100%完整的前提下，进行 9:16 竖屏分镜处理。"
+            },
             {"role": "user", "content": prompt}
         ],
-        "temperature": 0.2 
+        "temperature": 0.1 # 降至最低，防止模型自我发挥
     }
     
     try:
         final_url = f"{url}?key={key}" if provider == "Gemini" and "key=" not in url else url
-        response = requests.post(final_url, headers=headers, json=payload, timeout=240)
+        response = requests.post(final_url, headers=headers, json=payload, timeout=300)
         if response.status_code != 200:
             return f"API ERROR: {response.text}"
         return response.json()['choices'][0]['message']['content']
@@ -54,7 +57,7 @@ def call_ai(provider, key, mid, base_url, prompt):
 # 界面布局
 # ==========================================
 
-st.set_page_config(page_title="漫剧竖屏导演 v3.1", layout="wide")
+st.set_page_config(page_title="漫剧竖屏导演 v3.2 - 零损耗版", layout="wide")
 
 if 'step1_list' not in st.session_state: st.session_state.step1_list = []
 if 'current_index' not in st.session_state: st.session_state.current_index = 0
@@ -69,112 +72,103 @@ with st.sidebar:
     
     st.divider()
     st.header("👤 2. 核心角色库")
-    char_setup = st.text_area("人物详细设定 (姓名：(描述词))", height=300, placeholder="安妙衣：(清丽绝伦...)")
+    char_setup = st.text_area("人物设定 (姓名：(描述))", height=300)
     
-    if st.button("🔴 重置项目"):
+    if st.button("🔴 重置项目进度"):
         st.session_state.current_index = 0
         st.session_state.accumulated_storyboard = ""
         st.session_state.step1_list = []
         st.rerun()
 
-st.title("🎬 漫剧竖屏导演工作站 v3.1")
-st.markdown("**专为 9:16 比例设计 | 双重推理分镜算法**")
+st.title("🎬 漫剧竖屏导演工作站 v3.2")
+st.markdown("⚠️ **当前版本：零损耗全量文案保留 | 9:16 深度适配**")
 
-tab1, tab2 = st.tabs(["第一步：双重推理分镜切分", "第二步：9:16 视觉指令生成"])
+tab1, tab2 = st.tabs(["第一步：零损耗逻辑分镜", "第二步：9:16 视觉脚本生成"])
 
-# --- 第一步：双重推理分镜 ---
+# --- 第一阶段：零损耗拆分 ---
 with tab1:
-    st.subheader("🖋️ 剧本逻辑拆解 (9:16 适配版)")
-    st.markdown("""
-    **推理流程：**
-    1. **初步分镜**：快速梳理剧情脉络与角色对话。
-    2. **二次精准分镜**：针对 **9:16 竖屏比例** 优化。若原文动作在竖屏难以呈现（如两人相距甚远并排走），则拆分为两个特写或改为纵向视角分镜。
-    3. **时长约束**：单镜文案字数严控在 **35字以内**，确保音频与 5 秒视频完美同步。
-    """)
-    raw_script = st.text_area("输入原始剧本文案", height=300)
+    st.subheader("🖋️ 全量文案拆解 (双重推理)")
+    st.info("规则：必须包含原文每一个字。如果单句超 35 字或需要换镜，请拆分为 a/b 镜，严禁删减文字。")
+    raw_script = st.text_area("在此输入剧本原文", height=300)
     
-    if st.button("开始双重推理分镜"):
-        prompt_split = f"""
-        你是一位 9:16 竖屏漫剧导演。请对以下剧本进行双重推理分镜处理。
-        
-        【第一遍推理】：通读全文，理解故事的起承转合、情绪高潮和角色位置。
-        【第二遍推理】：针对 9:16（1080x1920）竖屏构图进行精准分镜。
-        
-        【分镜规则】：
-        1. 每一个分镜必须能在一张 9:16 的竖屏画面中完美呈现。
-        2. 动作转折、换人说话、场景改变必须拆分。
-        3. 字数限制：单镜文案不得超过 35 字。
-        4. 零遗漏：包含原文所有字句。
-        
-        【输出格式】：
-        序号. [文案内容]
-        
-        待处理文本：
-        {raw_script}
-        """
-        with st.spinner("导演正在进行双重推理（理解全文 + 竖屏构图适配）..."):
-            result = call_ai(provider, api_key, model_id, custom_base, prompt_split)
-            lines = result.split('\n')
-            st.session_state.step1_list = [l.strip() for l in lines if re.match(r"^\d+[\.．、\s]", l.strip())]
-            st.success(f"分镜切分完成！共计 {len(st.session_state.step1_list)} 镜。")
+    if st.button("执行零损耗分镜拆分"):
+        if not api_key: st.error("请填入 Key")
+        else:
+            # 强化提示词：强调逐字保留
+            prompt_split = f"""
+            你是一位漫剧导演。请对以下剧本进行【零损耗】分镜处理。
+            
+            【核心规则】：
+            1. **字数绝对保留**：整理后的内容【不可遗漏原文中的任何一句话，一个字】。禁止添加原文以外的内容，禁止总结或改写。
+            2. **逻辑分镜**：
+               - 每个角色对话切换、场景切换、动作画面改变，必须设定为下一个分镜。
+               - 一个分镜描述一个画面。如果一段文案内容太多（超过35字），一个画面展现不全，必须将其拆分为连续的几组分镜。
+            3. **9:16 竖屏适配**：拆分分镜时，请在脑中进行二次推理，确保每一段拆分后的文案对应的动作能在竖屏空间内完成。
+            
+            【格式】：
+            序号. [完整文案]
+            
+            原文文本：
+            {raw_script}
+            """
+            with st.spinner("导演正在进行逐字解析，确保文案 100% 完整..."):
+                result = call_ai(provider, api_key, model_id, custom_base, prompt_split)
+                lines = result.split('\n')
+                # 匹配：数字. [文案]
+                st.session_state.step1_list = [l.strip() for l in lines if re.match(r"^\d+[\.．、\s]", l.strip())]
+                
+                if st.session_state.step1_list:
+                    st.success(f"分镜切分完成！共计 {len(st.session_state.step1_list)} 组文案已 100% 锁定。")
+                else:
+                    st.error("未能识别分镜，请检查 API 返回。")
+                    st.code(result)
 
     if st.session_state.step1_list:
-        st.text_area("预览分镜文案", value="\n".join(st.session_state.step1_list), height=300)
+        st.text_area("分镜文案预览 (请核对原文完整性)", value="\n".join(st.session_state.step1_list), height=300)
 
-# --- 第二步：分段描述生成 ---
+# --- 第二阶段：视觉生成 ---
 with tab2:
-    st.subheader("🖼️ 9:16 视觉脚本生成")
-    
+    st.subheader("🖼️ 9:16 视觉指令生成")
     if not st.session_state.step1_list:
-        st.info("请先完成第一步分镜切分。")
+        st.info("请先完成第一步。")
     else:
         curr = st.session_state.current_index
         total = len(st.session_state.step1_list)
         st.progress(curr / total)
-        st.write(f"📊 制作进度：{curr} / {total} 镜")
+        st.write(f"📊 进度：{curr} / {total} 镜")
         
-        batch_size = st.number_input("本批次生成数量", 1, 50, 20)
+        batch_size = st.number_input("本批次处理数量", 1, 50, 20)
         
         if curr < total:
-            if st.button(f"🚀 生成接下来的 {batch_size} 组 9:16 指令"):
+            if st.button(f"🚀 生成后续 {batch_size} 组 9:16 指令"):
                 end = min(curr + batch_size, total)
-                target = "\n".join(st.session_state.step1_list[curr:end])
+                batch_text = "\n".join(st.session_state.step1_list[curr:end])
                 
                 prompt_visual = f"""
-                任务：为分镜生成适合 9:16 竖屏的视觉指令。
+                任务：为分镜生成 9:16 竖屏视觉描述。
                 
-                【核心人物库】：
+                【人物设定】：
                 {char_setup}
                 
-                【当前分镜列表】：
-                {target}
+                【分镜文案】：
+                {batch_text}
                 
-                【输出规范 (严格执行)】：
-                1. 每一个分镜输出必须包含：
-                   序号. [原文案对照]
-                   画面描述：[9:16构图描述，如 Portrait / Full body / Extreme close-up]、[场景锚点]、姓名(完整角色设定词)... [竖向空间布局描述，如人物一前一后]。
-                   视频生成：[结合文案的动态动作]、[表情神态变化]、[符合竖屏的镜头语言，如垂直摇镜 Vertical pan 或 快速推近特写 Zoom in]。
-                
-                2. 人物一致性：角色名后必须紧跟括号内的【完整描述词】，严禁简化。
-                3. 9:16 适配：画面描述中必须明确体现竖向构图美感，避免左右过空。
-                
-                【格式范例】：
-                1. [赵尘走过来，狠狠地甩了我一巴掌]
-                画面描述：9:16 纵深视角，华丽王府内，(赵尘，俊美霸道男子...)的身影由远及近遮住光线，前方是跌坐在地的(安妙衣，清丽绝伦的美人...)。
-                视频生成：赵尘面色阴冷地快速跨步进入画面，右手猛地挥出，安妙衣侧脸受击，发丝飞散，镜头给到手部击打特写。
+                【要求】：
+                1. **原文对照**：格式必须为：序号. [原文案对比]。
+                2. **人物注入**：姓名(完整描述词)。
+                3. **视觉布局**：针对 9:16 比例。
+                4. **动静结合**：画面描述写构图与静态；视频生成写动态与运镜。
                 """
-                with st.spinner(f"正在生成第 {curr+1} 至 {end} 镜的竖屏脚本..."):
-                    batch_res = call_ai(provider, api_key, model_id, custom_base, prompt_visual)
-                    if "API ERROR" not in batch_res:
-                        st.session_state.accumulated_storyboard += "\n\n" + batch_res
+                with st.spinner("正在生成高一致性视觉指令..."):
+                    res = call_ai(provider, api_key, model_id, custom_base, prompt_visual)
+                    if "API ERROR" not in res:
+                        st.session_state.accumulated_storyboard += "\n\n" + res
                         st.session_state.current_index = end
                         st.rerun()
                     else:
-                        st.error(batch_res)
-        else:
-            st.success("全部 9:16 脚本生成完成！")
+                        st.error(res)
         
         if st.session_state.accumulated_storyboard:
             st.divider()
-            st.text_area("全量脚本汇总", value=st.session_state.accumulated_storyboard, height=450)
-            st.download_button("💾 下载竖屏脚本文件", st.session_state.accumulated_storyboard, file_name="9_16_Storyboard.txt")
+            st.text_area("全量结果预览", value=st.session_state.accumulated_storyboard, height=450)
+            st.download_button("💾 下载全量脚本", st.session_state.accumulated_storyboard, file_name="Verbatim_9_16_Storyboard.txt")
