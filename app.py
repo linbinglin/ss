@@ -9,7 +9,7 @@ st.set_page_config(
     layout="wide"
 )
 
-# --- 核心提示词模版 (基于提供的V2.0模版) ---
+# --- 核心提示词模版 (基于 6秒分镜模版 - 黄金时间轴V2.0) ---
 SYSTEM_PROMPT = """
 # Role: 资深AI漫剧分镜导演 (6s-Video Specialist)
 ## Profile
@@ -74,9 +74,13 @@ with st.sidebar:
         placeholder="sk-..."
     )
     
-    # 3. 模型选择 (包含DeepSeek, GPT-4o, Claude等)
-    # 这里预设了一些常用模型ID，用户也可以手动输入
-    model_options = [
+    st.markdown("---")
+    
+    # 3. 模型选择 (包含自定义选项)
+    st.subheader("🤖 模型选择")
+    
+    # 预设常用列表
+    default_models = [
         "deepseek-chat",
         "deepseek-reasoner",
         "gpt-4o",
@@ -86,13 +90,34 @@ with st.sidebar:
         "grok-beta",
         "doubao-pro-32k"
     ]
-    selected_model = st.selectbox(
-        "选择模型 (Model ID)", 
+    # 添加"自定义"选项
+    model_options = default_models + ["✨ 自定义 (Custom Model)"]
+    
+    # 下拉选择框
+    selected_option = st.selectbox(
+        "选择预设模型", 
         options=model_options,
-        index=0, # 默认选择第一个
-        help="选择第三方接口支持的模型名称"
+        index=0, 
+        help="选择列表中的模型，或选择'自定义'手动输入"
     )
     
+    # 核心逻辑：如果是自定义，显示输入框；否则使用下拉框的值
+    if selected_option == "✨ 自定义 (Custom Model)":
+        final_model_id = st.text_input(
+            "请输入模型 ID", 
+            value="", 
+            placeholder="例如: deepseek-v3, o1-preview...",
+            help="输入接口方提供的准确模型ID"
+        )
+    else:
+        final_model_id = selected_option
+        
+    # 显示当前使用的模型ID (调试用)
+    if final_model_id:
+        st.caption(f"当前锁定模型: `{final_model_id}`")
+    else:
+        st.warning("⚠️ 请输入有效的模型 ID")
+
     st.markdown("---")
     st.info("💡 提示：请确保你的API Key有对应模型的访问权限。")
 
@@ -117,8 +142,11 @@ if uploaded_file is not None:
         st.text_area("Original Text", file_content, height=150)
 
     if st.button("🚀 开始AI分镜处理", type="primary"):
+        # 校验逻辑
         if not api_key:
             st.error("❌ 请先在左侧侧边栏输入 API Key")
+        elif not final_model_id:
+            st.error("❌ 模型 ID 不能为空")
         else:
             try:
                 # 初始化 OpenAI 客户端
@@ -132,13 +160,13 @@ if uploaded_file is not None:
                 
                 # 调用 API (流式输出)
                 stream = client.chat.completions.create(
-                    model=selected_model,
+                    model=final_model_id, # 使用最终确定的模型ID
                     messages=[
                         {"role": "system", "content": SYSTEM_PROMPT},
                         {"role": "user", "content": f"请处理以下文案：\n\n{file_content}"}
                     ],
                     stream=True,
-                    temperature=0.7 # 稍微降低随机性以保证格式稳定
+                    temperature=0.7 
                 )
                 
                 # 实时渲染流式响应
@@ -157,7 +185,7 @@ if uploaded_file is not None:
 # 3. 结果下载与展示
 if st.session_state.generated_content:
     st.markdown("---")
-    # 提取代码块中的内容 (如果AI输出了markdown代码块)
+    # 提取代码块中的内容
     final_text = st.session_state.generated_content
     # 简单的清洗逻辑，尝试去掉 ```txt 和 ``` 标记，只保留纯文本供下载
     clean_text = final_text.replace("```txt", "").replace("```", "").strip()
