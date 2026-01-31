@@ -2,7 +2,33 @@ import streamlit as st
 from openai import OpenAI
 import os
 
-# --- 核心提示词模版 (保持不变) ---
+# --- 页面配置 ---
+st.set_page_config(page_title="AI 6秒分镜助手", layout="wide")
+
+# --- 侧边栏：API 配置 ---
+st.sidebar.title("⚙️ 设置")
+
+st.sidebar.markdown("### 1. API 配置")
+# 默认使用云雾API地址，用户不可更改（根据你的需求）
+base_url = "https://yunwu.ai/v1/" 
+st.sidebar.info(f"API 地址: {base_url}")
+
+# API Key 输入
+api_key = st.sidebar.text_input("请输入 API Key (sk-...)", type="password", help="请输入云雾API的Key")
+
+# 模型名称自定义输入 (需求点3)
+st.sidebar.markdown("### 2. 模型选择")
+model_name = st.sidebar.text_input("输入模型名称", value="gpt-4o", help="例如: gpt-4o, claude-3-5-sonnet-20240620")
+
+st.sidebar.markdown("---")
+st.sidebar.markdown("### 关于")
+st.sidebar.markdown("此工具用于将长文案按**6秒黄金时间轴**进行智能切分，适配Runway/Sora等生成式AI。")
+
+# --- 主页面 ---
+st.title("🎬 AI 6秒漫剧分镜生成器")
+st.markdown("上传文案TXT文件，AI将自动按照 **[3.5s - 6.5s]** 的节奏重组分镜。")
+
+# --- 核心 Prompt 模版 (硬编码) ---
 SYSTEM_PROMPT = """
 # Role: 资深AI漫剧分镜导演 (6s-Video Specialist)
 ## Profile
@@ -46,129 +72,62 @@ SYSTEM_PROMPT = """
 请读取用户提供的字幕内容。
 1. **计算**: 按正常语速预估时长。
 2. **重组**: 严格执行[3.5s - 6.5s]的区间合并与切分。
-3. **输出**: 直接输出重组后的 `txt` 代码块。
+3. **划分语句**，为文本添加合适语句
+4. **输出**: 直接输出重组后的 `txt` 代码块。
 """
 
-# --- 页面配置 ---
-st.set_page_config(
-    page_title="AI 6秒分镜脚本生成器",
-    page_icon="🎬",
-    layout="wide"
-)
-
-# --- 侧边栏：设置 ---
-with st.sidebar:
-    st.header("⚙️ 模型设置")
-    
-    # 1. API Key
-    api_key = st.text_input("API Key", type="password", help="请输入你的云雾AI或其他中转 API 密钥")
-    
-    # 2. Base URL
-    base_url = st.text_input("Base URL (中转地址)", value="https://yunwu.ai/v1/")
-    
-    # 3. 模型选择 (下拉菜单 + 自定义)
-    st.markdown("### 🤖 模型选择")
-    
-    # 定义常用模型列表
-    model_options = [
-        "gpt-4o",
-        "deepseek-chat",
-        "claude-3-5-sonnet-20240620",
-        "gemini-1.5-pro",
-        "grok-beta",
-        "doubao-pro-32k", # 注意：豆包的模型ID在不同中转站可能不同
-        "👉 自定义输入 (Custom)"
-    ]
-    
-    selected_option = st.selectbox("请选择模型 ID", model_options, index=0)
-    
-    # 逻辑判断：如果用户选择了自定义，则显示输入框；否则直接使用选项值
-    if selected_option == "👉 自定义输入 (Custom)":
-        model_name = st.text_input(
-            "请输入自定义模型 ID", 
-            value="", 
-            placeholder="例如: deepseek-coder, gpt-4-turbo..."
-        )
-    else:
-        model_name = selected_option
-        #在此处显示当前选中的模型，确认用户所选
-        st.caption(f"当前使用模型: `{model_name}`")
-
-    st.markdown("---")
-    st.info("💡 提示：如果中转站的豆包或Grok模型ID与上方预设不同，请选择“自定义输入”手动填写。")
-
-# --- 主页面 ---
-st.title("🎬 6秒黄金时间轴 - 分镜生成器")
-st.markdown("专为 AI 视频生成 (Runway/Pika/Sora) 打造。自动将文案重组为 **3.5s-6.5s** 的标准分镜单元。")
-
-# 1. 文件上传
-uploaded_file = st.file_uploader("📂 选择本地文件 (TXT 或 SRT)", type=['txt', 'srt'])
+# --- 文件上传 (需求点1) ---
+uploaded_file = st.file_uploader("📂 请选择本地TXT文件", type=['txt'])
 
 if uploaded_file is not None:
     # 读取文件内容
     try:
         content = uploaded_file.read().decode("utf-8")
+        st.subheader("原始文案预览:")
+        st.text_area("Original Text", content, height=150)
+        
+        # 处理按钮
+        if st.button("🚀 开始分镜处理", type="primary"):
+            if not api_key:
+                st.error("请先在左侧侧边栏输入 API Key！")
+            else:
+                with st.spinner('AI导演正在思考分镜节奏...'):
+                    try:
+                        # 初始化 OpenAI 客户端 (需求点2 & 4)
+                        client = OpenAI(
+                            api_key=api_key,
+                            base_url=base_url
+                        )
+
+                        # 调用 API
+                        response = client.chat.completions.create(
+                            model=model_name, # 使用用户自定义的模型名称
+                            messages=[
+                                {"role": "system", "content": SYSTEM_PROMPT},
+                                {"role": "user", "content": content}
+                            ],
+                            temperature=0.7
+                        )
+                        
+                        # 获取结果
+                        result_text = response.choices[0].message.content
+                        
+                        # 展示结果
+                        st.success("处理完成！")
+                        st.subheader("📋 分镜结果")
+                        st.markdown(result_text)
+                        
+                        # 提供下载按钮
+                        st.download_button(
+                            label="📥 下载分镜结果 (.txt)",
+                            data=result_text,
+                            file_name="split_storyboard.txt",
+                            mime="text/plain"
+                        )
+
+                    except Exception as e:
+                        st.error(f"发生错误: {str(e)}")
+                        st.info("提示：请检查API Key是否正确，或确认该模型名称在云雾AI中可用。")
+                        
     except UnicodeDecodeError:
-        st.error("文件编码错误，请上传 UTF-8 编码的文本文件。")
-        st.stop()
-
-    # 显示原始内容预览
-    with st.expander("📄 查看原始文案", expanded=False):
-        st.text_area("原始内容", content, height=150)
-
-    # 生成按钮
-    if st.button("🚀 开始生成分镜", type="primary"):
-        # 校验输入
-        if not api_key:
-            st.error("❌ 请先在左侧侧边栏输入 API Key！")
-            st.stop()
-        if not base_url:
-            st.error("❌ 请输入 Base URL！")
-            st.stop()
-        if not model_name:
-            st.error("❌ 模型名称不能为空！如果是自定义模式，请在输入框填写模型ID。")
-            st.stop()
-
-        # --- API 调用逻辑 ---
-        client = OpenAI(api_key=api_key, base_url=base_url)
-        
-        st.divider()
-        st.subheader("📝 生成结果")
-        
-        # 结果容器
-        result_container = st.empty()
-        full_response = ""
-        
-        try:
-            # 发起流式请求
-            stream = client.chat.completions.create(
-                model=model_name,
-                messages=[
-                    {"role": "system", "content": SYSTEM_PROMPT},
-                    {"role": "user", "content": f"请处理以下文案：\n\n{content}"}
-                ],
-                stream=True
-            )
-            
-            # 实时显示
-            for chunk in stream:
-                if chunk.choices[0].delta.content is not None:
-                    content_chunk = chunk.choices[0].delta.content
-                    full_response += content_chunk
-                    result_container.markdown(full_response)
-            
-            # 下载按钮
-            st.download_button(
-                label="📥 下载分镜脚本 (.txt)",
-                data=full_response,
-                file_name="6s_storyboard_output.txt",
-                mime="text/plain"
-            )
-            
-        except Exception as e:
-            st.error(f"发生错误: {e}")
-            st.warning("常见原因：\n1. API Key 无效或余额不足。\n2. 模型 ID 填写错误（请检查中转站支持的确切模型名称）。\n3. 网络连接问题。")
-
-# --- 页脚 ---
-st.markdown("---")
-st.caption("Powered by Streamlit & OpenAI Compatible API")
+        st.error("文件编码错误，请确保上传的是 UTF-8 编码的 TXT 文件。")
