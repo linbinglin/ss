@@ -8,17 +8,41 @@ st.set_page_config(page_title="AI 6秒分镜助手", layout="wide")
 # --- 侧边栏：API 配置 ---
 st.sidebar.title("⚙️ 设置")
 
-st.sidebar.markdown("### 1. API 配置")
-# 默认使用云雾API地址，用户不可更改（根据你的需求）
+st.sidebar.markdown("### 1. API 接入")
+# 默认使用云雾API地址
 base_url = "https://yunwu.ai/v1/" 
-st.sidebar.info(f"API 地址: {base_url}")
+st.sidebar.info(f"中转接口: {base_url}")
 
 # API Key 输入
-api_key = st.sidebar.text_input("请输入 API Key (sk-...)", type="password", help="请输入云雾API的Key")
+api_key = st.sidebar.text_input("请输入 API Key", type="password", help="在此输入云雾API的Key (sk-...)")
 
-# 模型名称自定义输入 (需求点3)
+st.sidebar.markdown("---")
+
+# --- 核心功能：模型选择 (满足用户自定义填写需求) ---
 st.sidebar.markdown("### 2. 模型选择")
-model_name = st.sidebar.text_input("输入模型名称", value="gpt-4o", help="例如: gpt-4o, claude-3-5-sonnet-20240620")
+
+# 预设一些常用模型，最后加一个"自定义"选项
+model_mode = st.sidebar.radio(
+    "选择方式:",
+    ("选择常用模型", "自定义填写模型ID")
+)
+
+if model_mode == "选择常用模型":
+    # 这里的列表你可以根据云雾支持的模型随时补充
+    model_name = st.sidebar.selectbox(
+        "请选择模型:",
+        ["gpt-4o", "claude-3-5-sonnet-20240620", "gpt-4-turbo", "gpt-3.5-turbo"]
+    )
+else:
+    # 这里满足用户“自己填写”的需求
+    model_name = st.sidebar.text_input(
+        "请输入模型ID:", 
+        value="", 
+        placeholder="例如: deepseek-chat, gemini-pro...",
+        help="请准确输入模型在API中的ID名称"
+    )
+
+st.sidebar.info(f"当前使用的模型: **{model_name}**")
 
 st.sidebar.markdown("---")
 st.sidebar.markdown("### 关于")
@@ -28,7 +52,7 @@ st.sidebar.markdown("此工具用于将长文案按**6秒黄金时间轴**进行
 st.title("🎬 AI 6秒漫剧分镜生成器")
 st.markdown("上传文案TXT文件，AI将自动按照 **[3.5s - 6.5s]** 的节奏重组分镜。")
 
-# --- 核心 Prompt 模版 (硬编码) ---
+# --- 核心 Prompt 模版 ---
 SYSTEM_PROMPT = """
 # Role: 资深AI漫剧分镜导演 (6s-Video Specialist)
 ## Profile
@@ -76,7 +100,7 @@ SYSTEM_PROMPT = """
 4. **输出**: 直接输出重组后的 `txt` 代码块。
 """
 
-# --- 文件上传 (需求点1) ---
+# --- 文件上传 ---
 uploaded_file = st.file_uploader("📂 请选择本地TXT文件", type=['txt'])
 
 if uploaded_file is not None:
@@ -88,12 +112,15 @@ if uploaded_file is not None:
         
         # 处理按钮
         if st.button("🚀 开始分镜处理", type="primary"):
+            # 校验输入
             if not api_key:
-                st.error("请先在左侧侧边栏输入 API Key！")
+                st.error("❌ 错误：请先在左侧侧边栏输入 API Key！")
+            elif not model_name:
+                st.error("❌ 错误：模型名称不能为空！请在侧边栏选择或填写模型ID。")
             else:
-                with st.spinner('AI导演正在思考分镜节奏...'):
+                with st.spinner(f'AI导演正在使用 {model_name} 思考分镜节奏...'):
                     try:
-                        # 初始化 OpenAI 客户端 (需求点2 & 4)
+                        # 初始化 OpenAI 客户端
                         client = OpenAI(
                             api_key=api_key,
                             base_url=base_url
@@ -101,7 +128,7 @@ if uploaded_file is not None:
 
                         # 调用 API
                         response = client.chat.completions.create(
-                            model=model_name, # 使用用户自定义的模型名称
+                            model=model_name, # 使用用户选择或填写的模型名称
                             messages=[
                                 {"role": "system", "content": SYSTEM_PROMPT},
                                 {"role": "user", "content": content}
@@ -113,7 +140,7 @@ if uploaded_file is not None:
                         result_text = response.choices[0].message.content
                         
                         # 展示结果
-                        st.success("处理完成！")
+                        st.success("✅ 处理完成！")
                         st.subheader("📋 分镜结果")
                         st.markdown(result_text)
                         
@@ -127,7 +154,7 @@ if uploaded_file is not None:
 
                     except Exception as e:
                         st.error(f"发生错误: {str(e)}")
-                        st.info("提示：请检查API Key是否正确，或确认该模型名称在云雾AI中可用。")
+                        st.info("💡 提示：请检查API Key是否正确，或确认该模型ID是否存在于云雾AI中。")
                         
     except UnicodeDecodeError:
         st.error("文件编码错误，请确保上传的是 UTF-8 编码的 TXT 文件。")
