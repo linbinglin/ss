@@ -1,70 +1,16 @@
 import streamlit as st
 from openai import OpenAI
-import textwrap
+import os
 
-# 页面配置
+# --- 页面基础设置 ---
 st.set_page_config(
-    page_title="6秒黄金分镜助手",
-    page_icon="⏱️",
+    page_title="AI 6秒分镜大师",
+    page_icon="🎬",
     layout="wide"
 )
 
-# 侧边栏配置
-with st.sidebar:
-    st.header("⚙️ 设置")
-    
-    api_key = st.text_input("请输入 API Key", type="password", help="请填写云雾或其他中转平台的 API Key")
-    base_url = st.text_input("API Base URL", value="https://yunwu.ai/v1/", help="第三方中转接口地址")
-    
-    st.markdown("### 🤖 模型选择")
-    # 预设模型列表
-    model_options = [
-        "deepseek-chat",
-        "gpt-4o",
-        "claude-3-5-sonnet-20240620",
-        "deepseek-reasoner",
-        "自定义 (Custom)"
-    ]
-    
-    selected_model_option = st.selectbox(
-        "选择模型",
-        options=model_options,
-        index=0,
-        help="建议使用 deepseek-chat 或 gpt-4o，逻辑理解最强"
-    )
-
-    if selected_model_option == "自定义 (Custom)":
-        raw_model_id = st.text_input("👉 请手动输入模型 ID", value="", placeholder="例如: deepseek-v3")
-        model_id = raw_model_id.strip() 
-    else:
-        model_id = selected_model_option
-    
-    if model_id:
-        st.caption(f"当前使用模型: `{model_id}`")
-
-    st.markdown("---")
-    st.info("已加载：6秒分镜模版 - 黄金时间轴V2.0")
-
-# 主界面
-st.title("⏱️ 6秒 AI 漫剧分镜工具")
-st.markdown("专为 Runway/Kling/Luma 等 AI 视频模型设计，严格执行 **3.5s - 6.5s** 黄金节奏。")
-
-uploaded_file = st.file_uploader("选择本地 TXT 文件", type=['txt'])
-
-if uploaded_file is not None:
-    # 读取文件内容
-    try:
-        string_data = uploaded_file.read().decode("utf-8")
-        # 去掉原文的所有换行符，变成一整段，防止AI偷懒
-        clean_text = string_data.replace("\n", "").replace("\r", "").strip()
-        
-        st.subheader("📄 原文预览 (已去除格式)")
-        st.text_area("原文内容", clean_text, height=150, disabled=True)
-        
-        # ---------------------------------------------------------
-        # 核心 Prompt 设计 - 原封不动植入你的指令
-        # ---------------------------------------------------------
-        system_prompt = """
+# --- 核心提示词模版 (基于提供的V2.0模版) ---
+SYSTEM_PROMPT = """
 # Role: 资深AI漫剧分镜导演 (6s-Video Specialist)
 ## Profile
 - **身份**: 专精于**6秒短视频节奏**的分镜导演。你擅长将松散的台词压缩为高密度的“6秒视觉胶囊”。
@@ -95,17 +41,6 @@ if uploaded_file is not None:
 *   **严禁改词**: 绝对不允许修改、增加、删除原字幕的任何文字（汉字）。
 *   **清洗格式**: 必须去除SRT原本的序号（1,2...）和时间码（00:00:xx...）。
 
-## 思考路径修正示例 (Corrective Thinking)
-
-**[反面案例 - 节奏崩坏]**:
-1. 天亮了。(1.5s) -> *错误：太短，浪费一次生成机会*
-2. 阳光照在我的脸上，我觉得非常温暖，仿佛回到了童年。(9.0s) -> *错误：太长，6秒视频跑不完这段话，画面会嘴型对不上*
-
-**[正面案例 - 6秒黄金节奏]**:
-*(处理逻辑: 1太短，合并入2；合并后总长10.5s太长，寻找中间切分点)*
-1. 天亮了，阳光照在我的脸上。(4.0s) -> *完美：环境+状态*
-2. 我觉得非常温暖，仿佛回到了童年。(5.0s) -> *完美：情绪+想象*
-
 ## 输出格式 (Strict Output Format)
 - **纯文本**模式。
 - 每一行对应一个**6秒**的分镜。
@@ -119,60 +54,121 @@ if uploaded_file is not None:
 1. **计算**: 按正常语速预估时长。
 2. **重组**: 严格执行[3.5s - 6.5s]的区间合并与切分。
 3. **输出**: 直接输出重组后的 `txt` 代码块。
-
-**执行**
-深度思考后，直接开始执行。
 """
 
-        user_prompt = f"请对以下文本进行处理：\n\n{clean_text}"
+# --- 侧边栏：配置区域 ---
+with st.sidebar:
+    st.header("⚙️ 模型配置")
+    
+    # 1. API Base URL 配置
+    base_url = st.text_input(
+        "API Base URL (中转接口)", 
+        value="https://yunwu.ai/v1",
+        help="请输入OpenAI兼容接口地址，末尾通常包含/v1"
+    )
+    
+    # 2. API Key 配置
+    api_key = st.text_input(
+        "API Key", 
+        type="password", 
+        placeholder="sk-..."
+    )
+    
+    # 3. 模型选择 (包含DeepSeek, GPT-4o, Claude等)
+    # 这里预设了一些常用模型ID，用户也可以手动输入
+    model_options = [
+        "deepseek-chat",
+        "deepseek-reasoner",
+        "gpt-4o",
+        "gpt-4o-mini",
+        "claude-3-5-sonnet-20240620",
+        "gemini-pro",
+        "grok-beta",
+        "doubao-pro-32k"
+    ]
+    selected_model = st.selectbox(
+        "选择模型 (Model ID)", 
+        options=model_options,
+        index=0, # 默认选择第一个
+        help="选择第三方接口支持的模型名称"
+    )
+    
+    st.markdown("---")
+    st.info("💡 提示：请确保你的API Key有对应模型的访问权限。")
 
-        generate_btn = st.button("🚀 生成 6秒黄金分镜", type="primary")
+# --- 主界面 ---
+st.title("🎬 6秒黄金时间轴 - 智能分镜助手")
+st.markdown("上传剧本TXT，AI将自动按照 **[3.5s - 6.5s]** 的节奏进行分镜拆解，完美适配 Runway/Sora/Pika 生成。")
 
-        if generate_btn:
-            if not api_key:
-                st.error("请先在左侧侧边栏设置 API Key！")
-            elif not model_id:
-                st.error("请选择或输入有效的模型 ID！")
-            else:
-                st.divider()
-                st.subheader("🎞️ 6秒节奏分镜结果")
-                output_placeholder = st.empty()
+# 1. 文件上传
+uploaded_file = st.file_uploader("📂 选择本地 TXT 剧本文件", type=["txt"])
+
+# 初始化 Session State 用于存储结果
+if "generated_content" not in st.session_state:
+    st.session_state.generated_content = ""
+
+# 2. 执行按钮与逻辑
+if uploaded_file is not None:
+    # 读取文件内容
+    file_content = uploaded_file.read().decode("utf-8")
+    
+    # 显示原始内容预览
+    with st.expander("查看原始文案", expanded=False):
+        st.text_area("Original Text", file_content, height=150)
+
+    if st.button("🚀 开始AI分镜处理", type="primary"):
+        if not api_key:
+            st.error("❌ 请先在左侧侧边栏输入 API Key")
+        else:
+            try:
+                # 初始化 OpenAI 客户端
+                client = OpenAI(api_key=api_key, base_url=base_url)
+                
+                # 创建显示区域
+                result_area = st.empty()
                 full_response = ""
                 
-                try:
-                    client = OpenAI(
-                        api_key=api_key,
-                        base_url=base_url
-                    )
+                st.subheader("🤖 AI 处理结果")
+                
+                # 调用 API (流式输出)
+                stream = client.chat.completions.create(
+                    model=selected_model,
+                    messages=[
+                        {"role": "system", "content": SYSTEM_PROMPT},
+                        {"role": "user", "content": f"请处理以下文案：\n\n{file_content}"}
+                    ],
+                    stream=True,
+                    temperature=0.7 # 稍微降低随机性以保证格式稳定
+                )
+                
+                # 实时渲染流式响应
+                for chunk in stream:
+                    if chunk.choices[0].delta.content is not None:
+                        content = chunk.choices[0].delta.content
+                        full_response += content
+                        result_area.markdown(full_response)
+                
+                # 存储结果到 session state
+                st.session_state.generated_content = full_response
+                
+            except Exception as e:
+                st.error(f"发生错误: {str(e)}")
 
-                    stream = client.chat.completions.create(
-                        model=model_id,
-                        messages=[
-                            {"role": "system", "content": system_prompt},
-                            {"role": "user", "content": user_prompt}
-                        ],
-                        stream=True,
-                        temperature=0.1, # 保持低温，确保严格执行指令
-                    )
-
-                    for chunk in stream:
-                        if chunk.choices[0].delta.content is not None:
-                            content = chunk.choices[0].delta.content
-                            full_response += content
-                            output_placeholder.markdown(full_response)
-                    
-                    st.success("分镜处理完成！")
-                    
-                    st.download_button(
-                        label="📥 下载分镜脚本",
-                        data=full_response,
-                        file_name="6s_storyboard_script.txt",
-                        mime="text/plain"
-                    )
-
-                except Exception as e:
-                    st.error(f"发生错误: {str(e)}")
-                    st.info("提示：请检查 API Key 是否正确，或尝试更换模型 ID。")
-
-    except UnicodeDecodeError:
-        st.error("文件编码错误，请确保上传的是 UTF-8 编码的 TXT 文件。")
+# 3. 结果下载与展示
+if st.session_state.generated_content:
+    st.markdown("---")
+    # 提取代码块中的内容 (如果AI输出了markdown代码块)
+    final_text = st.session_state.generated_content
+    # 简单的清洗逻辑，尝试去掉 ```txt 和 ``` 标记，只保留纯文本供下载
+    clean_text = final_text.replace("```txt", "").replace("```", "").strip()
+    
+    col1, col2 = st.columns([1, 4])
+    with col1:
+        st.download_button(
+            label="📥 下载分镜脚本 (.txt)",
+            data=clean_text,
+            file_name="split_script_6s.txt",
+            mime="text/plain"
+        )
+    with col2:
+        st.success("✅ 处理完成！可以直接复制或下载。")
