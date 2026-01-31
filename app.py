@@ -4,8 +4,8 @@ import textwrap
 
 # 页面配置
 st.set_page_config(
-    page_title="智能文案分镜助手",
-    page_icon="🎬",
+    page_title="6秒黄金分镜助手",
+    page_icon="⏱️",
     layout="wide"
 )
 
@@ -17,43 +17,41 @@ with st.sidebar:
     base_url = st.text_input("API Base URL", value="https://yunwu.ai/v1/", help="第三方中转接口地址")
     
     st.markdown("### 🤖 模型选择")
-    # 预设模型列表，最后添加一个自定义选项
+    # 预设模型列表
     model_options = [
         "deepseek-chat",
-        "deepseek-reasoner",
         "gpt-4o",
         "claude-3-5-sonnet-20240620",
-        "gemini-1.5-pro",
-        "grok-beta",
-        "自定义 (Custom)"  # <--- 添加自定义选项
+        "deepseek-reasoner",
+        "自定义 (Custom)"
     ]
     
     selected_model_option = st.selectbox(
         "选择模型",
         options=model_options,
         index=0,
-        help="选择预设模型，或者选择'自定义'手动输入模型ID"
+        help="建议使用 deepseek-chat 或 gpt-4o，逻辑理解最强"
     )
 
-    # 逻辑判断：如果选择了自定义，则显示输入框；否则直接使用选择的值
     if selected_model_option == "自定义 (Custom)":
-        model_id = st.text_input("👉 请手动输入模型 ID", value="", placeholder="例如: deepseek-v3")
+        raw_model_id = st.text_input("👉 请手动输入模型 ID", value="", placeholder="例如: deepseek-v3")
+        model_id = raw_model_id.strip() 
     else:
         model_id = selected_model_option
     
-    # 显示当前使用的模型ID以供确认
     if model_id:
         st.caption(f"当前使用模型: `{model_id}`")
 
     st.markdown("---")
-    st.markdown("**分镜逻辑说明：**")
-    st.caption("1. 忽略原文段落，重新理解语义")
-    st.caption("2. 遇场景/对话/动作切换则分行")
-    st.caption("3. 严格原文输出，不改一字")
+    st.markdown("**⏱️ 6秒黄金时间轴逻辑：**")
+    st.info("目标：将文案重组为适合 AI 生成的 6秒视频单元。")
+    st.caption("1. **合并短句**：<3.5秒 (约10字内) 必须合并。")
+    st.caption("2. **切分长句**：>6.5秒 (约20字以上) 必须切分。")
+    st.caption("3. **严禁改词**：保持原文绝对一致。")
 
 # 主界面
-st.title("🎬 AI 智能文案分镜工具")
-st.markdown("上传 TXT 文本，AI 将自动分析剧情，进行专业的逐字逐句分镜处理。")
+st.title("⏱️ 6秒 AI 漫剧分镜工具")
+st.markdown("专为 Runway/Kling/Luma 等 AI 视频模型设计，自动将文案重组为 **3.5s - 6.5s** 的黄金节奏。")
 
 uploaded_file = st.file_uploader("选择本地 TXT 文件", type=['txt'])
 
@@ -61,59 +59,66 @@ if uploaded_file is not None:
     # 读取文件内容
     try:
         string_data = uploaded_file.read().decode("utf-8")
-        # 去掉原文的所有换行符，变成一整段，防止AI偷懒直接用原文分段
+        # 去掉原文的所有换行符，变成一整段
         clean_text = string_data.replace("\n", "").replace("\r", "").strip()
         
         st.subheader("📄 原文预览 (已去除格式)")
         st.text_area("原文内容", clean_text, height=150, disabled=True)
         
-       # 核心 Prompt 设计 (短剧行业定制版)
+        # 核心 Prompt 设计 - 6秒黄金时间轴版
         system_prompt = """
-你是一位经验丰富的短剧分镜导演。你的任务是根据用户提供的文本（小说或短剧脚本），将其重新划分为**适合短剧播放的分镜脚本**。你的目标是创造出节奏适中、叙事流畅、画面连贯的分镜，避免画面过于零碎或急促，确保观众的舒适观看体验。
+# Role: 资深AI漫剧分镜导演 (6s-Video Specialist)
 
-### 核心原则（必须严格遵守，任何违反都会导致任务失败）：
-1. **零篡改原则**：输出内容必须是原文的逐字逐句，**严禁**删减、增加、修改任何一个字（标点符号除外）。
-2. **去格式化理解**：完全忽略原文的段落排版。你需要先深入理解整个文本内容，然后根据“画面需要切换”的逻辑来重新划分分镜。
+## Profile
+- **身份**: 专精于**6秒短视频节奏**的分镜导演。你擅长将松散的台词压缩为高密度的“6秒视觉胶囊”。
+- **任务**: 读取用户提供的文本，将其重组为一系列**“6秒标准视频单元”**。
+- **核心目标**: 确保每一行文案对应的阅读/表演时长严格落在 **[3.5秒 - 6.5秒]** 区间内。完美适配Runway/Pika/Sora等模型的6秒生成模式。
 
-### 分镜切分逻辑（请专注于短剧的“呼吸感”和“流畅性”）：
+## 核心算法与绝对约束 (Crucial Algorithms)
 
-**强制切分点（必须换行）：**
-1.  **角色对话切换**：当对话角色发生变化时，必须切换分镜，以明确谁在说话。
-2.  **关键场景/时间切换**：当故事地点（如“来到街上”）、大幅时间（如“第二天早上”）发生明显变化时，必须切换分镜。
-3.  **核心事件/重大动作**：当剧情发生重大转折，或角色执行了对剧情有关键推动作用的“大动作”（如开门、摔碎东西、拔剑、冲刺、突然倒地等），需要一个明确的视觉变化时，必须切换分镜。
+### 1. 黄金时间轴锁定 (The 6s Golden Lock)
+*   **字数辅助估算**: 假设正常语速下，**4-5个汉字 ≈ 1秒**。
+    *   **目标区间**: 每行文案长度最好控制在 **12字 - 25字** 之间。
+*   **时长限制**:
+    *   **< 3.5秒 (约10字以内)**: **禁止单独输出**。必须向下合并下一句（除非是极短的强情绪爆发，如“滚！”）。
+    *   **> 6.5秒 (约30字以上)**: **强制预警**。必须寻找最近的语义停顿点（逗号）进行切分，否则视频生成会由快变慢或画面冻结。
 
-**灵活切分点（在保持连贯性前提下，根据语义和视觉主体决定是否换行）：**
-4.  **语义单元完整性**：将承载一个**完整思想、情感或叙事单元**的文本段落归为一个分镜。即使这个单元包含多句话，只要**视觉主体保持一致或连续**（例如：一个角色持续的内心独白、一段连续的环境描述、一次持续进行的互动），就应尽量保持在一个分镜内，以维持画面的稳定性。
-5.  **视觉焦点转移**：当文本描述的**主要视觉焦点**从A转移到B时（例如从“人物”转移到“他手中的信件”），可以考虑切换分镜，以提供特写或不同角度的画面。但如果B是A的附属，可以在同一分镜内。
-6.  **情绪或状态剧烈变化**：当人物的情绪或状态在短时间内发生剧烈、需要视觉强调的变化时，可考虑切换分镜。
+### 2. 视觉密度整合法则 (Visual Consolidation)
+在6秒的时长里，画面必须饱满但不能杂乱。
+*   **合并原则 (Merge)**:
+    *   **动作+结果**: “我拿起杯子” (短) + “喝了一口水” (短) = **合并输出**。
+    *   **环境+主体**: “雨很大” (短) + “淋湿了我的头发” (短) = **合并输出**。
+*   **切分原则 (Split)**:
+    *   如果两句话合并后过长（超过30字），必须在中间的逗号或逻辑转折处切开。
 
-**节奏与长度控制（避免零碎或拖沓）：**
-7.  **分镜内容长度**：每个分镜所对应的文案长度要合理分配。
-    *   **不宜过短**：避免为了细枝末节而频繁切分，一个分镜内容不应少于5个字（强烈视觉暗示或音效提示除外）。
-    *   **不宜过长**：但也不能长到涵盖多个独立的视觉事件或导致画面长时间没有实质性变化。如果一段文字描述了多个独立的、需要不同镜头表现的场景或动作，则应适当拆分。
-    *   **目标**：力求每个分镜的文本能对应2-7秒左右的画面展示，让观众有足够的时间理解。
+### 3. 语义原子性 (Semantic Atomicity)
+*   **关联词保护**: 严禁在“因为/所以/但是/虽然”之后立刻断句。
+*   **主谓不离**: 严禁出现“我是(换行)一个好人”这种低级错误。
 
-### 输出格式：
-请输出纯净的数字列表，不要包含任何解释性文字或“好的，为您分镜如下”等内容：
-1.第一句文案内容
-2.第二句文案内容
-3.第三句文案内容
-...
+### 4. 原文零容忍协议 (Zero Tolerance)
+*   **严禁改词**: 绝对不允许修改、增加、删除原文的任何文字（汉字）。
+*   **格式**: 请输出纯净的文本，每一行是一句完整的分镜。
 
-### 示例参考 (针对短剧的优化)：
-**输入**：
-8岁那年家里穷得揭不开锅了怀孕的母亲带着我在寺外乞讨我把僧人端来的粥饭全给了母亲施粥的将军府老妇人, 让人领我过来问都饿成人干了怎么不吃
+## 思考路径修正示例
 
-**短剧分镜输出**：
-1.8岁那年家里穷得揭不开锅了
-2.怀孕的母亲带着我在寺外乞讨
-3.我把僧人端来的粥饭全给了母亲
-4.施粥的将军府老妇人, 让人领我过来问都饿成人干了怎么不吃 (注：老妇人的动作和疑问可以合并，因为是连续的事件和角色聚焦)
+**[反面案例 - 节奏崩坏]**:
+1. 天亮了。(太短，浪费生成次数)
+2. 阳光照在我的脸上，我觉得非常温暖，仿佛回到了童年。(太长，画面会不够用)
+
+**[正面案例 - 6秒黄金节奏]**:
+1. 天亮了，阳光照在我的脸上。 (环境+状态，约4秒，完美)
+2. 我觉得非常温暖，仿佛回到了童年。 (情绪+想象，约5秒，完美)
+
+## 输出格式
+1.请直接输出序号列表。
+2.不要包含任何分析过程或废话。
+3.每一行的末尾必须保留原文标点。
+
 """
 
-        user_prompt = f"请对以下文本进行分镜处理：\n\n{clean_text}"
+        user_prompt = f"请对以下文本进行【6秒黄金分镜】处理：\n\n{clean_text}"
 
-        generate_btn = st.button("🚀 开始生成分镜", type="primary")
+        generate_btn = st.button("🚀 生成 6秒黄金分镜", type="primary")
 
         if generate_btn:
             if not api_key:
@@ -122,7 +127,7 @@ if uploaded_file is not None:
                 st.error("请选择或输入有效的模型 ID！")
             else:
                 st.divider()
-                st.subheader("🎞️ 分镜结果")
+                st.subheader("🎞️ 6秒节奏分镜结果")
                 output_placeholder = st.empty()
                 full_response = ""
                 
@@ -132,7 +137,6 @@ if uploaded_file is not None:
                         base_url=base_url
                     )
 
-                    # 使用流式输出 (Stream=True)
                     stream = client.chat.completions.create(
                         model=model_id,
                         messages=[
@@ -140,23 +144,21 @@ if uploaded_file is not None:
                             {"role": "user", "content": user_prompt}
                         ],
                         stream=True,
-                        temperature=0.3, # 降低随机性，保证忠实原文
+                        temperature=0.1, # 极低温度，确保严格遵循合并规则，不乱发挥
                     )
 
-                    # 实时显示结果
                     for chunk in stream:
                         if chunk.choices[0].delta.content is not None:
                             content = chunk.choices[0].delta.content
                             full_response += content
                             output_placeholder.markdown(full_response)
                     
-                    st.success("分镜处理完成！")
+                    st.success("分镜处理完成！符合 3.5s - 6.5s 节奏。")
                     
-                    # 提供下载按钮
                     st.download_button(
                         label="📥 下载分镜脚本",
                         data=full_response,
-                        file_name="storyboard_script.txt",
+                        file_name="6s_storyboard_script.txt",
                         mime="text/plain"
                     )
 
@@ -166,7 +168,3 @@ if uploaded_file is not None:
 
     except UnicodeDecodeError:
         st.error("文件编码错误，请确保上传的是 UTF-8 编码的 TXT 文件。")
-
-
-
-
