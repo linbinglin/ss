@@ -16,22 +16,35 @@ with st.sidebar:
     api_key = st.text_input("请输入 API Key", type="password", help="请填写云雾或其他中转平台的 API Key")
     base_url = st.text_input("API Base URL", value="https://yunwu.ai/v1/", help="第三方中转接口地址")
     
-    # 预设模型列表，支持手动输入
+    st.markdown("### 🤖 模型选择")
+    # 预设模型列表，最后添加一个自定义选项
     model_options = [
         "deepseek-chat",
         "deepseek-reasoner",
         "gpt-4o",
         "claude-3-5-sonnet-20240620",
         "gemini-1.5-pro",
-        "grok-beta"
+        "grok-beta",
+        "自定义 (Custom)"  # <--- 添加自定义选项
     ]
-    model_id = st.selectbox(
-        "选择或输入模型 ID",
+    
+    selected_model_option = st.selectbox(
+        "选择模型",
         options=model_options,
         index=0,
-        help="请选择你想使用的模型，也可以直接输入模型名称"
+        help="选择预设模型，或者选择'自定义'手动输入模型ID"
     )
+
+    # 逻辑判断：如果选择了自定义，则显示输入框；否则直接使用选择的值
+    if selected_model_option == "自定义 (Custom)":
+        model_id = st.text_input("👉 请手动输入模型 ID", value="", placeholder="例如: deepseek-v3")
+    else:
+        model_id = selected_model_option
     
+    # 显示当前使用的模型ID以供确认
+    if model_id:
+        st.caption(f"当前使用模型: `{model_id}`")
+
     st.markdown("---")
     st.markdown("**分镜逻辑说明：**")
     st.caption("1. 忽略原文段落，重新理解语义")
@@ -90,6 +103,8 @@ if uploaded_file is not None:
         if generate_btn:
             if not api_key:
                 st.error("请先在左侧侧边栏设置 API Key！")
+            elif not model_id:
+                st.error("请选择或输入有效的模型 ID！")
             else:
                 st.divider()
                 st.subheader("🎞️ 分镜结果")
