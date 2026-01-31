@@ -1,143 +1,152 @@
 import streamlit as st
 from openai import OpenAI
-import time
+import os
 
 # --- 页面基础配置 ---
 st.set_page_config(
-    page_title="AI 智能文案分镜助手",
+    page_title="AI 深度文案分镜师 (逻辑增强版)",
     page_icon="🎬",
     layout="wide"
 )
 
+# --- 自定义 CSS (优化阅读体验) ---
+st.markdown("""
+<style>
+    .stTextArea textarea {
+        font-size: 14px !important;
+        line-height: 1.5 !important;
+    }
+    .main-header {
+        font-size: 24px;
+        font-weight: bold;
+        color: #333;
+    }
+</style>
+""", unsafe_allow_html=True)
+
 # --- 侧边栏配置 ---
-st.sidebar.title("⚙️ 设置")
+st.sidebar.title("⚙️ 参数设置")
 
 # 1. API 配置
-api_key = st.sidebar.text_input("请输入 API Key (云雾AI)", type="password", help="请填写您的 yunwu.ai API 密钥")
-base_url = "https://yunwu.ai/v1"  # 固定要求的中转地址
+api_key = st.sidebar.text_input("请输入 API Key (云雾AI)", type="password", help="必须填写 yunwu.ai 的 API 密钥")
+base_url = "https://yunwu.ai/v1"
 
-# 2. 模型选择 (包含用户要求的模型)
+# 2. 模型选择 (覆盖主流强逻辑模型)
 model_options = [
-    "gpt-4o",
-    "deepseek-chat",  # DeepSeek V3
-    "deepseek-reasoner", # DeepSeek R1
-    "claude-3-5-sonnet-20240620",
+    "gpt-4o",  # 首选，逻辑最强
+    "claude-3-5-sonnet-20240620", # 文学性强，适合小说推文
+    "deepseek-chat",  # 性价比高
     "gemini-1.5-pro-latest",
-    "grok-beta",
-    "doubao-pro-32k", # 假设中转支持的豆包模型名称，可根据实际情况修改
     "gpt-4o-mini"
 ]
-# 允许用户手动输入模型名称（防止API模型名称变动）
-selected_model = st.sidebar.selectbox("选择 AI 模型", model_options)
-custom_model = st.sidebar.text_input("自定义模型名称 (如果上述列表不可用)", "")
+selected_model = st.sidebar.selectbox("选择 AI 模型", model_options, index=0)
+custom_model = st.sidebar.text_input("自定义模型ID (可选)", "")
 
-# 最终使用的模型ID
+# 最终使用的模型
 final_model = custom_model if custom_model else selected_model
 
 st.sidebar.markdown("---")
-st.sidebar.info(f"当前连接节点: {base_url}\n\n当前模型: {final_model}")
+st.sidebar.info(f"🔗 接口地址: {base_url}\n\n🤖 当前模型: {final_model}")
+st.sidebar.warning("💡 提示：为了达到图2的逻辑效果，建议使用 GPT-4o 或 Claude-3.5，它们的语义理解能力最强。")
 
 # --- 主界面 ---
-st.title("🎬 智能文案分镜生成器")
+st.title("🎬 AI 深度文案分镜生成器 (逻辑增强版)")
 st.markdown("""
-本工具将自动把文本转化为视频分镜脚本。
-**处理逻辑：**
-1. 自动清除原文所有段落格式，防止AI偷懒。
-2. 根据**对话、场景、动作**严格拆解分镜。
-3. 保证**不漏一字、不加一字**。
+> **核心功能**：本工具专门解决“分镜太碎”、“逻辑混乱”的问题。
+> 它会将上传的文本打散，重新根据**画面完整性**进行聚合，生成逻辑清晰的推文分镜。
 """)
 
-# 3. 文件上传
 uploaded_file = st.file_uploader("请上传文案 (.txt)", type=['txt'])
 
-# --- 核心处理逻辑 ---
 if uploaded_file is not None:
-    # 读取文件
+    # 1. 读取文件
     original_text = uploaded_file.read().decode("utf-8")
     
-    # 预处理：显示原文统计
-    st.subheader("📄 原文预览")
-    with st.expander("点击查看原文内容", expanded=False):
-        st.text_area("原文", original_text, height=200)
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        st.subheader("📄 原文内容")
+        st.text_area("原始文本", original_text, height=400, disabled=True)
 
-    # 核心动作：点击开始分镜
-    if st.button("🚀 开始生成分镜", type="primary"):
-        if not api_key:
-            st.error("请先在左侧侧边栏输入 API Key！")
-        else:
-            # 1. 预处理文本：去掉所有换行符，强制变成一行，迫使AI重新思考结构
-            flattened_text = original_text.replace("\n", "").replace("\r", "").replace("　", "")
-            
-            # 2. 构建系统提示词 (Prompt Engineering) - 严格遵循你的5点要求
-            system_prompt = f"""
-你是一个专业的视频分镜脚本师。请对用户提供的文本进行严格的分镜处理。
+    with col2:
+        st.subheader("🎞️ 分镜生成区")
+        generate_btn = st.button("🚀 开始重构分镜", type="primary", use_container_width=True)
 
-【重要原则】
-1. **完整性**：输出的内容必须包含原文的每一个字，**严禁删减**，也**严禁添加**原文以外的任何剧情或描述。
-2. **结构重组**：原文已被压缩为一行。你需要根据语义重新划分。
-3. **分镜触发条件**：
-   - 角色对话切换时 -> 新分镜
-   - 场景地点切换时 -> 新分镜
-   - 动作画面发生明显改变时 -> 新分镜
-4. **节奏控制**：
-   - 分镜文案不能太长（避免视觉疲劳）。
-   - 分镜文案不能太短（避免画面过于破碎）。
-   - 请根据语义逻辑合理断句。
+        if generate_btn:
+            if not api_key:
+                st.error("请在侧边栏填写 API Key！")
+            else:
+                # 2. 核心预处理：彻底去格式化，变成“一坨”纯文本
+                # 这一步是为了防止AI偷懒直接按原文的换行来分镜
+                clean_text = original_text.replace("\n", "").replace("\r", "").replace("　", "").replace(" ", "")
+                
+                # 3. 核心 Prompt (提示词工程) - 这是实现“图2”效果的关键
+                system_prompt = f"""
+你是一位拥有10年经验的短视频分镜导演。你的任务是将一段“无格式的纯文本”重构为一份逻辑严密、画面感强的分镜脚本。
 
-【输出格式要求】
-请直接输出数字编号的分镜列表，不要包含任何开场白或结束语。
-格式如下：
-1. [文案内容]
-2. [文案内容]
-3. [文案内容]
-...
+【核心原则 - 绝对禁止项】
+1. **禁止删减**：原文的每一个字都必须保留，不能少一个字。
+2. **禁止瞎编**：严禁添加原文没有的形容词或剧情。
+3. **禁止太碎**：严禁把一句话（如“8岁那年家里穷”）单独切成一行，必须结合上下文组成完整画面。
 
-请处理以下文本：
+【分镜划分逻辑 - 模仿图2风格】
+你需要先在脑海中对文本进行语义断句，然后按照以下标准分段（每段即一个镜头）：
+
+1. **整合背景**：将时间、地点、背景状态的描述合并在一起。
+   * 错误示例：1.8岁那年 2.家里穷
+   * 正确示例：1.8岁那年家里穷得揭不开锅了，怀孕的母亲带着我在寺外乞讨。
+   
+2. **整合动作与结果**：将一个动作及其直接结果，或连续的一组动作放在同一个分镜。
+   * 正确示例：2.我把僧人端来的粥饭全给了母亲，施粥的将军府老妇人让人领我过来问。
+
+3. **对话独立**：重要的对话通常需要独立成一个分镜，以便给观众展示说话人的神态。
+   * 正确示例：3.“都饿成人干了，怎么不吃？”
+
+4. **动作与神态**：如果是对话前的神态描写，可以单独成镜，或者与小声回应结合。
+   * 正确示例：4.我局促地拽着自己残破的衣角，低头小声回她。
+
+【输出格式】
+请直接输出分镜列表，格式为“数字序号. 内容”，不要包含任何其他废话。
+
+待处理文本如下：
 """
-            
-            # 显示处理状态
-            status_box = st.status("正在请求 AI 模型进行分镜拆解...", expanded=True)
-            
-            try:
-                client = OpenAI(api_key=api_key, base_url=base_url)
                 
-                status_box.write(f"正在连接模型: {final_model}...")
-                status_box.write("正在进行语义分析与场景重组...")
-                
-                # 流式输出 (Stream) 以获得更好的体验
-                stream = client.chat.completions.create(
-                    model=final_model,
-                    messages=[
-                        {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": flattened_text}
-                    ],
-                    stream=True,
-                    temperature=0.7 # 稍微降低创造性，保证忠实于原文
-                )
-                
-                st.subheader("🎞️ 分镜脚本结果")
-                result_container = st.empty()
+                status_box = st.status("正在进行深度语义分析...", expanded=True)
+                result_placeholder = st.empty()
                 full_response = ""
-                
-                for chunk in stream:
-                    if chunk.choices[0].delta.content is not None:
-                        full_response += chunk.choices[0].delta.content
-                        result_container.markdown(full_response)
-                
-                status_box.update(label="✅ 分镜处理完成！", state="complete", expanded=False)
-                
-                # 提供下载按钮
-                st.download_button(
-                    label="📥 下载分镜脚本 (.txt)",
-                    data=full_response,
-                    file_name="分镜脚本.txt",
-                    mime="text/plain"
-                )
-                
-            except Exception as e:
-                status_box.update(label="❌ 发生错误", state="error")
-                st.error(f"调用 API 时发生错误: {str(e)}")
-                st.info("提示：请检查您的 API Key 是否正确，或所选模型ID是否有效。")
 
-else:
-    st.info("请先上传一个 TXT 文件以开始。")
+                try:
+                    client = OpenAI(api_key=api_key, base_url=base_url)
+                    
+                    status_box.write(f"正在调用 {final_model} 进行逻辑重组...")
+                    
+                    stream = client.chat.completions.create(
+                        model=final_model,
+                        messages=[
+                            {"role": "system", "content": system_prompt},
+                            {"role": "user", "content": clean_text}
+                        ],
+                        stream=True,
+                        temperature=0.6, # 降低随机性，提高逻辑稳定性
+                        max_tokens=4000
+                    )
+                    
+                    for chunk in stream:
+                        if chunk.choices[0].delta.content is not None:
+                            content = chunk.choices[0].delta.content
+                            full_response += content
+                            result_placeholder.markdown(full_response)
+                            
+                    status_box.update(label="✅ 分镜重构完成", state="complete", expanded=False)
+                    
+                    # 提供下载
+                    st.download_button(
+                        label="📥 下载整理好的分镜 (.txt)",
+                        data=full_response,
+                        file_name="逻辑分镜脚本.txt",
+                        mime="text/plain"
+                    )
+
+                except Exception as e:
+                    status_box.update(label="❌ 发生错误", state="error")
+                    st.error(f"错误信息: {str(e)}")
