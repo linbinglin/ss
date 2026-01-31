@@ -1,161 +1,143 @@
 import streamlit as st
 from openai import OpenAI
-import os
+import time
 
-# --- 核心提示词模版 (根据你的文件内容植入) ---
-SYSTEM_PROMPT_TEMPLATE = """
-# Role: 资深AI漫剧分镜导演 (6s-Video Specialist)
-## Profile
-- **身份**: 专精于**6秒短视频节奏**的分镜导演。你擅长将松散的台词压缩为高密度的“6秒视觉胶囊”。
-- **任务**: 读取用户提供的字幕（SRT或文本），将其重组为一系列**“6秒标准视频单元”**。
-- **核心目标**: 确保每一行文案对应的阅读/表演时长严格落在 **[3.5秒 - 6.5秒]** 区间内。完美适配Runway/Pika/Sora等模型的6秒生成模式。
-
-## 核心算法与绝对约束 (Crucial Algorithms)
-
-### 1. 黄金时间轴锁定 (The 6s Golden Lock)
-*   **目标时长**: **6秒** (AI生成视频的标准时长)。
-*   **文案时长限制**: 单行文案的阅读时长必须控制在 **3.5秒 - 6.5秒**。
-    *   **< 3.5秒**: **禁止输出**。必须向下合并下一句（除非是极短的强情绪词，如“滚！”）。
-    *   **> 6.5秒**: **强制预警**。必须寻找最近的语义点进行切分，否则视频生成会由快变慢或画面冻结。
-
-### 2. 视觉密度整合法则 (Visual Consolidation)
-在6秒的时长里，画面必须饱满但不能杂乱。
-*   **合并原则**:
-    *   **动作+结果**: “我拿起杯子” (2s) + “喝了一口水” (2s) = **4s (完美合并)**。-> *输出: 我拿起杯子喝了一口水。*
-    *   **环境+主体**: “雨很大” (2s) + “淋湿了我的头发” (3s) = **5s (完美合并)**。-> *输出: 雨很大，淋湿了我的头发。*
-*   **切分原则**:
-    *   如果两句话合并后超过7秒（约30个字），必须在中间的逗号或逻辑转折处切开，确保每一段都在6秒内。
-
-### 3. 语义原子性 (Semantic Atomicity)
-*   **关联词保护**: 严禁在“因为/所以/但是/虽然”之后立刻断句。
-*   **主谓不离**: 严禁出现“我是(换行)一个好人”这种低级错误。
-
-### 4. 原文零容忍协议 (Zero Tolerance)
-*   **严禁改词**: 绝对不允许修改、增加、删除原字幕的任何文字（汉字）。
-*   **清洗格式**: 必须去除SRT原本的序号（1,2...）和时间码（00:00:xx...）。
-
-## 输出格式 (Strict Output Format)
-- **纯文本**模式。
-- 每一行对应一个**6秒**的分镜。
-- **严禁**输出时间码、序号、解析或废话。
-- 每一行的末尾必须是标点符号。
-- 每一行的前方必须加上序号。
-- 最终结果必须放在 `txt` 代码块中。
-
-## 初始化指令
-请读取用户提供的字幕内容。
-1. **计算**: 按正常语速预估时长。
-2. **重组**: 严格执行[3.5s - 6.5s]的区间合并与切分。
-3. **划分语句**：为文本添加合适标点。
-4. **输出**: 直接输出重组后的 `txt` 代码块。
-"""
-
-# --- 页面配置 ---
+# --- 页面基础配置 ---
 st.set_page_config(
-    page_title="AI视频分镜大师 (6秒法则)",
+    page_title="AI 智能文案分镜助手",
     page_icon="🎬",
     layout="wide"
 )
 
-# --- 侧边栏：API 配置 ---
-st.sidebar.header("🔌 API 设置")
-st.sidebar.markdown("配置云雾API或其他中转服务")
+# --- 侧边栏配置 ---
+st.sidebar.title("⚙️ 设置")
 
-api_base = st.sidebar.text_input("API Base URL", value="https://yunwu.ai/v1/")
-api_key = st.sidebar.text_input("API Key", type="password", help="请输入您的API Key")
+# 1. API 配置
+api_key = st.sidebar.text_input("请输入 API Key (云雾AI)", type="password", help="请填写您的 yunwu.ai API 密钥")
+base_url = "https://yunwu.ai/v1"  # 固定要求的中转地址
 
-# 模型预设列表 (包含你要求的模型)
-model_options = {
-    "DeepSeek V3": "deepseek-chat",
-    "DeepSeek R1": "deepseek-reasoner",
-    "GPT-4o": "gpt-4o",
-    "Claude 3.5 Sonnet": "claude-3-5-sonnet-20240620",
-    "Gemini Pro": "gemini-1.5-pro",
-    "Grok Beta": "grok-beta",
-    "豆包 (Doubao)": "doubao-pro-32k", # 注意：具体ID需根据中转商实际支持填写
-    "自定义模型": "custom"
-}
+# 2. 模型选择 (包含用户要求的模型)
+model_options = [
+    "gpt-4o",
+    "deepseek-chat",  # DeepSeek V3
+    "deepseek-reasoner", # DeepSeek R1
+    "claude-3-5-sonnet-20240620",
+    "gemini-1.5-pro-latest",
+    "grok-beta",
+    "doubao-pro-32k", # 假设中转支持的豆包模型名称，可根据实际情况修改
+    "gpt-4o-mini"
+]
+# 允许用户手动输入模型名称（防止API模型名称变动）
+selected_model = st.sidebar.selectbox("选择 AI 模型", model_options)
+custom_model = st.sidebar.text_input("自定义模型名称 (如果上述列表不可用)", "")
 
-selected_model_label = st.sidebar.selectbox("选择大模型", list(model_options.keys()))
+# 最终使用的模型ID
+final_model = custom_model if custom_model else selected_model
 
-if selected_model_label == "自定义模型":
-    model_name = st.sidebar.text_input("请输入自定义模型ID")
-else:
-    model_name = model_options[selected_model_label]
-
-st.sidebar.info(f"当前使用模型 ID: `{model_name}`")
+st.sidebar.markdown("---")
+st.sidebar.info(f"当前连接节点: {base_url}\n\n当前模型: {final_model}")
 
 # --- 主界面 ---
-st.title("🎬 AI 6秒分镜生成器")
-st.markdown("**功能**：上传剧本/字幕，自动按「6秒黄金法则」拆解分镜。")
+st.title("🎬 智能文案分镜生成器")
+st.markdown("""
+本工具将自动把文本转化为视频分镜脚本。
+**处理逻辑：**
+1. 自动清除原文所有段落格式，防止AI偷懒。
+2. 根据**对话、场景、动作**严格拆解分镜。
+3. 保证**不漏一字、不加一字**。
+""")
 
-# 1. 文件上传
-uploaded_file = st.file_uploader("📂 选择本地文件 (TXT/SRT)", type=['txt', 'srt', 'md'])
+# 3. 文件上传
+uploaded_file = st.file_uploader("请上传文案 (.txt)", type=['txt'])
 
+# --- 核心处理逻辑 ---
 if uploaded_file is not None:
-    # 读取文件内容
-    try:
-        content = uploaded_file.read().decode("utf-8")
-        st.subheader("📄 原文预览")
-        with st.expander("查看原文内容", expanded=False):
-            st.text_area("Original Text", content, height=150, label_visibility="collapsed")
-    except Exception as e:
-        st.error(f"文件读取失败，请确保文件是 UTF-8 编码。错误: {e}")
-        content = None
+    # 读取文件
+    original_text = uploaded_file.read().decode("utf-8")
+    
+    # 预处理：显示原文统计
+    st.subheader("📄 原文预览")
+    with st.expander("点击查看原文内容", expanded=False):
+        st.text_area("原文", original_text, height=200)
 
-    # 2. 执行按钮
-    if content and api_key:
-        if st.button("🚀 开始生成分镜 (AI Process)", type="primary"):
+    # 核心动作：点击开始分镜
+    if st.button("🚀 开始生成分镜", type="primary"):
+        if not api_key:
+            st.error("请先在左侧侧边栏输入 API Key！")
+        else:
+            # 1. 预处理文本：去掉所有换行符，强制变成一行，迫使AI重新思考结构
+            flattened_text = original_text.replace("\n", "").replace("\r", "").replace("　", "")
             
-            result_placeholder = st.empty()
-            result_placeholder.info("正在连接 AI 模型进行深度思考与分镜拆解，请稍候...")
+            # 2. 构建系统提示词 (Prompt Engineering) - 严格遵循你的5点要求
+            system_prompt = f"""
+你是一个专业的视频分镜脚本师。请对用户提供的文本进行严格的分镜处理。
 
+【重要原则】
+1. **完整性**：输出的内容必须包含原文的每一个字，**严禁删减**，也**严禁添加**原文以外的任何剧情或描述。
+2. **结构重组**：原文已被压缩为一行。你需要根据语义重新划分。
+3. **分镜触发条件**：
+   - 角色对话切换时 -> 新分镜
+   - 场景地点切换时 -> 新分镜
+   - 动作画面发生明显改变时 -> 新分镜
+4. **节奏控制**：
+   - 分镜文案不能太长（避免视觉疲劳）。
+   - 分镜文案不能太短（避免画面过于破碎）。
+   - 请根据语义逻辑合理断句。
+
+【输出格式要求】
+请直接输出数字编号的分镜列表，不要包含任何开场白或结束语。
+格式如下：
+1. [文案内容]
+2. [文案内容]
+3. [文案内容]
+...
+
+请处理以下文本：
+"""
+            
+            # 显示处理状态
+            status_box = st.status("正在请求 AI 模型进行分镜拆解...", expanded=True)
+            
             try:
-                # 初始化 OpenAI 客户端 (兼容云雾API)
-                client = OpenAI(
-                    api_key=api_key,
-                    base_url=api_base
-                )
-
-                # 调用 API
-                response = client.chat.completions.create(
-                    model=model_name,
+                client = OpenAI(api_key=api_key, base_url=base_url)
+                
+                status_box.write(f"正在连接模型: {final_model}...")
+                status_box.write("正在进行语义分析与场景重组...")
+                
+                # 流式输出 (Stream) 以获得更好的体验
+                stream = client.chat.completions.create(
+                    model=final_model,
                     messages=[
-                        {"role": "system", "content": SYSTEM_PROMPT_TEMPLATE},
-                        {"role": "user", "content": f"请处理以下文本：\n\n{content}"}
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": flattened_text}
                     ],
-                    stream=True, # 开启流式输出
-                    temperature=0.7
+                    stream=True,
+                    temperature=0.7 # 稍微降低创造性，保证忠实于原文
                 )
-
-                # 流式接收结果
+                
+                st.subheader("🎞️ 分镜脚本结果")
+                result_container = st.empty()
                 full_response = ""
-                for chunk in response:
-                    if chunk.choices[0].delta.content:
+                
+                for chunk in stream:
+                    if chunk.choices[0].delta.content is not None:
                         full_response += chunk.choices[0].delta.content
-                        result_placeholder.markdown(full_response + "▌")
+                        result_container.markdown(full_response)
                 
-                # 显示最终结果
-                result_placeholder.markdown(full_response)
+                status_box.update(label="✅ 分镜处理完成！", state="complete", expanded=False)
                 
-                st.success("✅ 分镜生成完成！")
-
-                # 3. 下载功能
+                # 提供下载按钮
                 st.download_button(
                     label="📥 下载分镜脚本 (.txt)",
                     data=full_response,
-                    file_name="storyboard_output.txt",
+                    file_name="分镜脚本.txt",
                     mime="text/plain"
                 )
-
+                
             except Exception as e:
-                result_placeholder.empty()
-                st.error(f"❌ API 请求出错: {str(e)}")
-                st.warning("建议检查：1. API Key 是否正确。 2. 模型 ID 是否有效。 3. 账户余额。")
-    
-    elif content and not api_key:
-        st.warning("⚠️ 请在左侧边栏输入 API Key 才能开始处理。")
+                status_box.update(label="❌ 发生错误", state="error")
+                st.error(f"调用 API 时发生错误: {str(e)}")
+                st.info("提示：请检查您的 API Key 是否正确，或所选模型ID是否有效。")
 
-# --- 底部版权 ---
-st.divider()
-st.caption("Powered by Streamlit | 6秒黄金时间轴V2.0算法")
+else:
+    st.info("请先上传一个 TXT 文件以开始。")
