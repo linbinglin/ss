@@ -173,17 +173,32 @@ with control_cols[2]:
     # 新增：剧情范围锚定
     plot_focus = st.text_input("本集剧情范围(防流水账):", placeholder="例：只写前30%女主被刁难的情节")
     
-    if st.button(f"🎥 第3轮：生成第 {episode_num} 集", use_container_width=True):
+    if st.button(f"🎥 第3轮：生成第 {episode_num} 集 (Seedance 2.0专版)", use_container_width=True):
         prompt = f"""
-        开始生成剧本 第{episode_num}集。
+        开始生成剧本 第{episode_num}集。注意：本剧本将直接喂给【即梦Seedance 2.0】进行视频直出。
+        Seedance 2.0 具有极强的自然语言理解力，但其致命弱点是“无法理解比喻/拟物修辞”。
         
-        【剧情进度锚定】：本集只允许推进以下剧情：{plot_focus if plot_focus else '根据原文合理推进单集容量'}。绝对禁止剧情快进或流水账！
+        因此，你必须严格遵守新增的【去比喻化物理直译法则】：
+        1. 绝对禁止在“画面”描写中出现任何【像...一样】、【宛如...】的比喻词！
+        2. 绝对禁止引入当前场景中不存在的“比喻名词”（如毛毛虫、太阳、冰山、天使）。
+        3. 必须将小说的“类比描写”翻译为：【几何形状】+【光影色彩】+【面部肌肉微操】的绝对物理状态。
+
+        【错误与正确示范】：
+        ❌ 原文：这个人的笑容像太阳般耀眼。
+        ❌ 错误分镜：他笑起来像太阳一样耀眼。（Seedance会画出太阳）
+        ✅ 正确分镜：（特写）暖黄色的顶光打在他脸上，他嘴角大幅度上扬露出牙齿，眼角挤出笑纹，整个画面色调变得极为明亮温暖。
+        
+        ❌ 原文：我用被子把小米裹成了“毛毛虫”的形状。
+        ❌ 错误分镜：小米被裹成了毛毛虫的形状。
+        ✅ 正确分镜：（全景）小米被一条厚重的绿色棉被紧紧缠绕，棉被呈长圆柱体，把她的四肢完全束缚贴在躯干上，只露出一颗脑袋。
+        
+        【剧情进度锚定】：
+        {plot_focus if plot_focus else '根据原文合理推进单集容量。'}
         
         【核心人设依据】：
         {st.session_state.global_setting}
         
-        请严格执行【第3轮：剧本生成】的前置A、B、C、D并输出10-15个分镜。
-        小说原文参考（请结合范围提取细节）：\n{st.session_state.novel_content}
+        小说原文参考：\n{st.session_state.novel_content}
         """
         chat_with_ai(prompt)
 
