@@ -288,12 +288,16 @@ SYSTEM_PROMPT = SYSTEM_PROMPT.strip()
 st.set_page_config(page_title="微短剧3.1 剧本生成系统", page_icon="🎬", layout="wide")
 
 if "messages" not in st.session_state:
-    # 初始化系统指令
     st.session_state.messages = [{"role": "system", "content": SYSTEM_PROMPT}]
 if "novel_content" not in st.session_state:
     st.session_state.novel_content = ""
 if "last_ai_response" not in st.session_state:
     st.session_state.last_ai_response = ""
+if "chapter_analysis" not in st.session_state:
+    st.session_state.chapter_analysis = ""
+if "selected_segments" not in st.session_state:
+    st.session_state.selected_segments = ""
+
 # ==========================================
 # 3. 侧边栏：API配置与记忆面板
 # ==========================================
@@ -302,33 +306,31 @@ with st.sidebar:
     api_key = st.text_input("输入 API Key", type="password", help="第三方API平台的密钥")
     base_url = st.text_input("接口地址 (Base URL)", value="https://yunwu.ai/v1/")
     
-    # ------------------ 修改了这里 ------------------
     st.subheader("🤖 模型选择")
-    # 预设几个目前最流行的高级写剧本模型
     model_options = [
-        "deepseek-chat",           # DeepSeek V3 (性价比之王)
-        "deepseek-reasoner",       # DeepSeek R1 (深度思考模型)
-        "gpt-4o",                  # OpenAI 最新全能模型
-        "claude-3-5-sonnet-20241022", # Claude 最新模型 (写文科极强)
+        "deepseek-chat",
+        "deepseek-reasoner",
+        "gpt-4o",
+        "claude-3-5-sonnet-20241022",
         "✍️ 自定义 (手动输入其他模型ID)"
     ]
     
     selected_model = st.selectbox("选择常用模型", model_options)
     
-    # 如果用户选择自定义，则弹出一个输入框让他自己填中转站的模型名称
     if selected_model == "✍️ 自定义 (手动输入其他模型ID)":
         model_name = st.text_input("请输入中转站对应的真实 模型ID", value="deepseek-chat", help="请参考 yunwu.ai 或你的中转站后台支持的模型名称列表")
     else:
         model_name = selected_model
         
     st.info(f"当前生效模型: **{model_name}**")
-    # ------------------------------------------------
     
     st.markdown("---")
     st.header("🧠 全局记忆管理")
     st.caption("以下面板由AI自动更新，如果你发现AI遗忘了，可以在此点击清空重置。")
     if st.button("🗑️ 清空所有对话记忆", use_container_width=True):
         st.session_state.messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+        st.session_state.chapter_analysis = ""
+        st.session_state.selected_segments = ""
         st.success("记忆已清空，系统已重置为初始状态。")
 
 # ==========================================
@@ -351,12 +353,11 @@ def chat_with_ai(prompt):
         full_response = ""
         
         try:
-            # 开启流式输出
             response = client.chat.completions.create(
                 model=model_name,
                 messages=st.session_state.messages,
                 stream=True,
-                temperature=0.7 # 控制一定的创造力，但又不会太乱
+                temperature=0.7
             )
             for chunk in response:
                 if chunk.choices[0].delta.content is not None:
@@ -365,38 +366,39 @@ def chat_with_ai(prompt):
             message_placeholder.markdown(full_response)
         except Exception as e:
             st.error(f"API 请求失败: {e}")
-            st.session_state.messages.pop() # 失败则移除刚才的用户提问
+            st.session_state.messages.pop()
             return
             
     st.session_state.messages.append({"role": "assistant", "content": full_response})
     st.session_state.last_ai_response = full_response
-# ==========================================
-# 5. 主工作区：小说输入与工作流
-# ==========================================
-st.title("🎬 影视化视觉翻译引擎 V3.1")
-st.markdown("> **“小说是给耳朵的，剧本是给眼睛的。”** —— 严格按照6层视觉翻译法则执行。")
 
-# 面板1：添加小说章节 (优化交互逻辑)
-with st.expander("📝 步骤一：导入小说章节原文 (防文字转文字偷懒机制)", expanded=True):
+# ==========================================
+# 5. 主工作区
+# ==========================================
+st.title("🎬 影视化视觉翻译引擎 V3.2")
+st.markdown("> **"小说是给耳朵的，剧本是给眼睛的。"** —— 严格按照视觉翻译法则执行。新增：章节拆解与取舍决策，杜绝流水账。")
+
+# ========== 面板1：导入小说 ==========
+with st.expander("📝 步骤一：导入小说章节原文", expanded=True):
     col1, col2 = st.columns([1, 1])
     with col1:
         uploaded_file = st.file_uploader("选择本地 TXT 文件", type=["txt"])
     with col2:
         pasted_text = st.text_area("或者在此处直接粘贴章节内容", height=150)
     
-    # 获取当前输入框或文件中的文本
     current_input = ""
     if uploaded_file is not None:
         current_input = uploaded_file.getvalue().decode("utf-8")
     elif pasted_text:
         current_input = pasted_text
 
-    # 操作按钮组
     btn_col1, btn_col2, btn_col3 = st.columns([2, 2, 4])
     with btn_col1:
         if st.button("📥 录入为当前处理章节 (覆盖旧内容)", type="primary"):
             if current_input:
                 st.session_state.novel_content = current_input
+                st.session_state.chapter_analysis = ""
+                st.session_state.selected_segments = ""
                 st.success(f"成功录入！当前待处理小说共计 {len(st.session_state.novel_content)} 字。")
             else:
                 st.warning("请先上传文件或粘贴文本！")
@@ -411,8 +413,7 @@ with st.expander("📝 步骤一：导入小说章节原文 (防文字转文字�
     if st.session_state.novel_content:
         st.info(f"💡 系统内存中已有 {len(st.session_state.novel_content)} 字的小说原稿供提取。")
 
-# 面板2：系统工作流控制台
-st.markdown("### ⚙️ 编剧工作流控制台")
+# ========== 面板2：全局设定 ==========
 if "global_setting" not in st.session_state:
     st.session_state.global_setting = "暂无全局设定，请先执行第1轮提炼，然后把觉得好的设定复制到这里备用。"
 
@@ -422,6 +423,104 @@ with st.expander("🧠 全局驱动卡与设定库 (允许人工修改)", expand
         value=st.session_state.global_setting, 
         height=200
     )
+
+# ========== 面板3：章节拆解面板（新增核心功能） ==========
+st.markdown("---")
+st.markdown("### 🔬 步骤二：章节拆解与取舍决策（新增关键步骤）")
+st.caption("这一步是解决"AI把整章内容硬塞进剧本导致流水账"的核心。AI会先分析这一章有哪些事件，哪些值得拍，哪些应该砍掉，然后你来做最终决策。")
+
+with st.expander("📋 章节拆解结果（AI分析后自动填充，你可以手动修改）", expanded=True):
+    st.session_state.chapter_analysis = st.text_area(
+        "章节事件拆解（点击下方按钮让AI分析，或手动填写）：",
+        value=st.session_state.chapter_analysis,
+        height=200,
+        help="这里会列出本章的所有事件单元，以及AI对每个事件的取舍建议"
+    )
+    
+    st.session_state.selected_segments = st.text_area(
+        "✅ 最终确认：本集要拍的内容（从上方分析中选取，或自己写）：",
+        value=st.session_state.selected_segments,
+        height=100,
+        placeholder="例如：只拍事件2（女主被婆婆当众羞辱）和事件3（男主冷眼旁观），其他全部砍掉。本集核心情绪：憋屈→爆发前的最后一根稻草。"
+    )
+
+analysis_cols = st.columns(2)
+with analysis_cols[0]:
+    if st.button("🔬 AI自动拆解本章（推荐先点这个）", use_container_width=True, type="primary"):
+        if not st.session_state.novel_content:
+            st.warning("请先在上方录入小说内容！")
+        else:
+            analysis_prompt = f"""
+【任务：章节拆解与取舍决策】
+
+你现在是一个资深微短剧编剧总监。在动笔写任何一个分镜之前，你必须先完成以下分析工作。
+
+请阅读以下小说章节原文，然后严格按照下面的格式输出分析结果：
+
+═══════════════════════════════════════
+一、事件拆解（把这一章拆成独立的"事件单元"）
+═══════════════════════════════════════
+
+把这一章按照"发生了什么事"拆成若干个独立事件。每个事件用以下格式：
+
+【事件1】一句话概括（例：女主在公司被上司当众训斥）
+- 涉及角色：XX、XX
+- 情绪价值：这个事件能给观众带来什么情绪？（爽/虐/心动/紧张/笑/无感）
+- 视觉潜力：这个事件拍出来好不好看？有没有强画面？（高/中/低）
+- 信息功能：这个事件是交代背景/推进主线/建立人设/埋伏笔/纯过渡？
+- 耗时预估：如果要拍好这个事件，大约需要几秒？（注意微短剧一集只有90-150秒）
+
+【事件2】……
+（以此类推）
+
+═══════════════════════════════════════
+二、取舍建议
+═══════════════════════════════════════
+
+基于以上分析，给出明确的取舍建议：
+
+🟢 必须保留（核心事件，删了观众看不懂）：
+- 事件X：理由
+- 事件X：理由
+
+🟡 建议精简（有用但可以压缩成1-2个镜头带过）：
+- 事件X：建议怎么压缩
+
+🔴 建议砍掉（对视觉叙事没有贡献，或可以用其他方式替代）：
+- 事件X：理由，以及如果观众需要知道这个信息，可以用什么视觉方式替代
+
+═══════════════════════════════════════
+三、单集容量评估
+═══════════════════════════════════════
+
+按照90-150秒的单集时长，这一章的内容：
+- 适合拆成几集？
+- 如果只做1集，建议聚焦哪些事件？
+- 本集的核心情绪曲线应该是什么？（例：压抑→爆发→悬念）
+- 本集的"一句话卖点"是什么？（观众看完这一集会跟朋友说的那句话）
+
+═══════════════════════════════════════
+
+小说原文如下：
+{st.session_state.novel_content}
+
+角色设定参考：
+{st.session_state.global_setting}
+"""
+            chat_with_ai(analysis_prompt)
+            st.info("💡 请阅读AI的分析结果，然后将你认可的取舍方案复制到上方的"最终确认"框中，再进入下一步生成剧本。")
+
+with analysis_cols[1]:
+    if st.button("🎯 我已确认取舍方案，锁定本集内容", use_container_width=True):
+        if st.session_state.selected_segments:
+            st.success("✅ 取舍方案已锁定！现在可以进入下方的剧本生成流程。")
+        else:
+            st.warning("请先在上方"最终确认"框中填写本集要拍的具体内容！")
+
+# ========== 面板4：编剧工作流控制台 ==========
+st.markdown("---")
+st.markdown("### ⚙️ 步骤三：编剧工作流控制台")
+
 control_cols = st.columns(4)
 
 with control_cols[0]:
@@ -440,14 +539,64 @@ with control_cols[2]:
     episode_num = st.number_input("集数", min_value=1, value=1, label_visibility="collapsed")
     plot_focus = st.text_input("本集剧情范围(防流水账):", placeholder="例：只写前30%女主被刁难的情节")
     
-    if st.button(f"🎥 第3轮：生成第 {episode_num} 集 (带单镜自检版)", use_container_width=True):
+    if st.button(f"🎥 第3轮：生成第 {episode_num} 集", use_container_width=True):
+        # 构建聚焦指令——这是核心改动
+        focus_instruction = ""
+        if st.session_state.selected_segments:
+            focus_instruction = f"""
+        
+        ════════════════════════════════════════════
+        ⚠️⚠️⚠️ 【最高优先级：聚焦指令】⚠️⚠️⚠️
+        ════════════════════════════════════════════
+        
+        用户已经完成了章节拆解和取舍决策。
+        本集只允许拍摄以下内容，其他一律不写：
+        
+        {st.session_state.selected_segments}
+        
+        【铁律】：
+        1. 上述范围以外的小说内容，本集一个字都不要碰。不要"顺带提一下"，不要"用一个镜头带过"，直接当它不存在。
+        2. 把全部90-150秒的时长，集中花在上述指定内容上。宁可把一个事件拍得细腻饱满，也不要为了"完整"而塞进更多情节。
+        3. 如果指定内容中有多个事件，按照情绪曲线合理分配时长，不要平均分配。高潮事件给更多秒数，过渡事件压缩到1-2个镜头。
+        
+        ════════════════════════════════════════════
+        """
+        elif plot_focus:
+            focus_instruction = f"""
+        
+        ════════════════════════════════════════════
+        ⚠️ 【聚焦指令】
+        ════════════════════════════════════════════
+        用户指定本集只写：{plot_focus}
+        超出此范围的内容一律不碰。
+        ════════════════════════════════════════════
+        """
+        else:
+            focus_instruction = """
+        
+        ════════════════════════════════════════════
+        ⚠️ 【警告：用户未指定聚焦范围】
+        ════════════════════════════════════════════
+        用户没有指定本集要聚焦的具体内容。
+        请你自行判断：这一章小说中，最适合作为单独一集（90-150秒）的核心事件是什么？
+        
+        【强制要求】：
+        - 不要试图在一集里覆盖整章内容
+        - 选择1-2个最有视觉冲击力和情绪价值的事件
+        - 明确告诉用户你选择了哪些事件、放弃了哪些事件，以及原因
+        - 在剧本正文之前，先输出一个【本集聚焦声明】
+        ════════════════════════════════════════════
+        """
+        
         prompt = f"""
         【当前任务说明书：请仔细阅读以下生成标准】
         开始生成剧本 第{episode_num}集。本剧本直接喂给【即梦Seedance 2.0】生成视频。
+        {focus_instruction}
         
         【核心要求】：
         1. 必须使用物理维度的确切描述，禁止极其复杂的连续动作。
-        2. “可以保留描述基础人类情绪的副词（如：愤怒地、委屈地嘟嘴），但严禁使用跨物种或非自然现象的比喻（如：像太阳、像毛毛虫）
+        2. 可以保留描述基础人类情绪的副词（如：愤怒地、委屈地嘟嘴），但严禁使用跨物种或非自然现象的比喻（如：像太阳、像毛毛虫）
+        
         【🚨 强制格式要求：单镜对比自检】
         为了绝对保证剧本符合 Seedance 2.0 的渲染要求，你在生成**每一个分镜**时，必须严格按照以下【先自检，后输出】的结构排版：
 
@@ -456,6 +605,7 @@ with control_cols[2]:
         1. 动作降维了吗？（是/否，将XX拆解为了XX）
         2. 存在比喻词或抽象名词吗？（是/否，将XX比喻转化为了XX物理光影/动作）
         3. 上下分镜内容能衔接上吗（是/否）
+        4. 这个分镜是否在讲"聚焦指令"范围内的事件？（是/否——如果否，删掉这个分镜）
         【分镜 1 正文】
         场景：[时间/地点/光影]
         画面+台词/音效：[景别] + [主体视觉锚定] + [物理动作] + [具体环境介质]=[台词嵌入正确的位置]
@@ -547,7 +697,7 @@ with control_cols[2]:
 这是一张静态图片，不是10秒的视频。）
 
 ✅ 饱满版（内容真正撑满10秒）：
-"走廊尽头，女主端着两杯咖啡转过拐角——Loss
+"走廊尽头，女主端着两杯咖啡转过拐角——
 脚步在包厢玻璃门外顿住。（全景：走廊透视纵深，
 她的身影映在玻璃门上形成半透明倒影）
 咖啡杯盖缝渗出的热气在她指尖上方飘散。
@@ -578,28 +728,39 @@ with control_cols[2]:
   眼睛在看哪？必须同步描写。
 
 
-        【剧情进度锚定】：
-        {plot_focus if plot_focus else '根据原文合理推进单集容量。'}
-        
         【核心人设依据】：
         {st.session_state.global_setting}
         
-        小说原文参考：\n{st.session_state.novel_content}
+        小说原文参考：
+        {st.session_state.novel_content}
         """
         chat_with_ai(prompt)
 
 
 with control_cols[3]:
     if st.button("🔍 第4轮：原著对比自检", use_container_width=True):
+        # 在自检中也加入聚焦范围的检查
+        focus_check = ""
+        if st.session_state.selected_segments:
+            focus_check = f"""
+        
+        额外检查项——聚焦范围遵守度：
+        用户指定本集只拍：{st.session_state.selected_segments}
+        请逐个分镜检查：是否有任何分镜在讲述指定范围以外的内容？
+        如果有，标记为🔴违规，并建议删除或替换。
+        """
+        
         check_prompt = f"""
         请严格执行【第4轮：自检与优化】。
         对比刚刚生成的剧本与我上传的小说原文，针对每一个剧本分镜进行详细的检查。
         1. 调用敌对视角攻击（普通观众、竞品编剧、原著粉）。
         2. 进行量化打分。
         3. 7分以下的项目必须立即给出修改版！
+        {focus_check}
         
         小说原文参考：
         {st.session_state.novel_content}
+        
         三个敌对视角攻击：
 
 视角1——普通观众：
@@ -627,9 +788,11 @@ with control_cols[3]:
 - 时长准确度（标注时长与内容实算时长偏差是否≤±2秒）：___
 - 分镜密度（每个10-14秒分镜是否≥3个动作事件+≥2次景别变化）：___
 - 视觉翻译完成度（是否有任何一处在用台词替代画面叙事）：___
+- 聚焦范围遵守度（是否所有分镜都在指定范围内）：___
 7分以下的项目必须立即修改并输出修改版。     
         """
         chat_with_ai(check_prompt)
+
 st.divider()
 
 # ==========================================
@@ -639,7 +802,6 @@ col_title, col_download = st.columns([3, 1])
 with col_title:
     st.subheader("💬 创作记录面板")
 with col_download:
-    # 如果系统有最新生成的回复，展示下载按钮
     if st.session_state.last_ai_response:
         st.download_button(
             label="💾 将最新结果下载为 TXT",
@@ -649,12 +811,10 @@ with col_download:
             use_container_width=True
         )
 
-# 过滤掉系统提示词，只展示用户和AI的对话
 for msg in st.session_state.messages:
     if msg["role"] != "system":
         with st.chat_message(msg["role"]):
             st.markdown(msg["content"])
 
-# 允许用户自由输入修改指令（如：只改第X集/优化台词等）
 if user_input := st.chat_input("自由模式：输入如'只优化台词'、'修改第3个分镜，让他更冷血一点'..."):
     chat_with_ai(user_input)
