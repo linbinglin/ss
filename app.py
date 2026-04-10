@@ -24,7 +24,8 @@ if "messages" not in st.session_state:
     st.session_state.messages = [{"role": "system", "content": SYSTEM_PROMPT}]
 if "novel_content" not in st.session_state:
     st.session_state.novel_content = ""
-
+if "last_ai_response" not in st.session_state:
+    st.session_state.last_ai_response = ""
 # ==========================================
 # 3. 侧边栏：API配置与记忆面板
 # ==========================================
@@ -100,14 +101,14 @@ def chat_with_ai(prompt):
             return
             
     st.session_state.messages.append({"role": "assistant", "content": full_response})
-
+    st.session_state.last_ai_response = full_response
 # ==========================================
 # 5. 主工作区：小说输入与工作流
 # ==========================================
 st.title("🎬 影视化视觉翻译引擎 V3.1")
 st.markdown("> **“小说是给耳朵的，剧本是给眼睛的。”** —— 严格按照6层视觉翻译法则执行。")
 
-# 面板1：添加小说章节
+# 面板1：添加小说章节 (优化交互逻辑)
 with st.expander("📝 步骤一：导入小说章节原文 (防文字转文字偷懒机制)", expanded=True):
     col1, col2 = st.columns([1, 1])
     with col1:
@@ -115,16 +116,32 @@ with st.expander("📝 步骤一：导入小说章节原文 (防文字转文字�
     with col2:
         pasted_text = st.text_area("或者在此处直接粘贴章节内容", height=150)
     
-    # 合并文本内容
-    current_text = ""
+    # 获取当前输入框或文件中的文本
+    current_input = ""
     if uploaded_file is not None:
-        current_text = uploaded_file.getvalue().decode("utf-8")
-    if pasted_text:
-        current_text = pasted_text
-        
-    if current_text:
-        st.success(f"已成功加载小说内容，共计 {len(current_text)} 字。")
-        st.session_state.novel_content = current_text
+        current_input = uploaded_file.getvalue().decode("utf-8")
+    elif pasted_text:
+        current_input = pasted_text
+
+    # 操作按钮组
+    btn_col1, btn_col2, btn_col3 = st.columns([2, 2, 4])
+    with btn_col1:
+        if st.button("📥 录入为当前处理章节 (覆盖旧内容)", type="primary"):
+            if current_input:
+                st.session_state.novel_content = current_input
+                st.success(f"成功录入！当前待处理小说共计 {len(st.session_state.novel_content)} 字。")
+            else:
+                st.warning("请先上传文件或粘贴文本！")
+    with btn_col2:
+        if st.button("➕ 追加新章节 (保留之前内容)"):
+            if current_input:
+                st.session_state.novel_content += "\n\n" + current_input
+                st.success(f"追加成功！当前系统内小说总计 {len(st.session_state.novel_content)} 字。")
+            else:
+                st.warning("请先上传文件或粘贴文本！")
+    
+    if st.session_state.novel_content:
+        st.info(f"💡 系统内存中已有 {len(st.session_state.novel_content)} 字的小说原稿供提取。")
 
 # 面板2：系统工作流控制台
 st.markdown("### ⚙️ 编剧工作流控制台")
@@ -133,9 +150,9 @@ control_cols = st.columns(4)
 with control_cols[0]:
     if st.button("🚀 第1轮：全局提炼", use_container_width=True):
         if not st.session_state.novel_content:
-            st.warning("请先在上方导入小说内容！")
+            st.warning("请先在上方录入小说内容！")
         else:
-            prompt = f"【微短剧3.1启动】\n以下为小说最新内容，请执行【第1轮：全局提炼】。\n\n小说内容如下：\n{st.session_state.novel_content}"
+            prompt = f"【微短剧3.1启动】\n以下为当前系统内的小说内容，请执行【第1轮：全局提炼】。\n\n小说内容如下：\n{st.session_state.novel_content}"
             chat_with_ai(prompt)
 
 with control_cols[1]:
@@ -145,16 +162,19 @@ with control_cols[1]:
 with control_cols[2]:
     episode_num = st.number_input("集数设置", min_value=1, max_value=100, value=1, label_visibility="collapsed")
     if st.button(f"🎥 第3轮：生成第 {episode_num} 集", use_container_width=True):
-        chat_with_ai(f"开始生成剧本 第{episode_num}集。请严格执行【第3轮：剧本生成】的前置A、B、C、D并输出10-15个分镜。")
+        chat_with_ai(f"开始生成剧本 第{episode_num}集。请严格执行【第3轮：剧本生成】的前置A、B、C、D并输出10-15个分镜。小说原文参考（如需）：\n{st.session_state.novel_content}")
 
 with control_cols[3]:
     if st.button("🔍 第4轮：原著对比自检", use_container_width=True):
-        check_prompt = """
+        check_prompt = f"""
         请严格执行【第4轮：自检与优化】。
-        对比刚刚生成的剧本与小说原文，针对每一个剧本分镜进行详细的检查。
+        对比刚刚生成的剧本与我上传的小说原文，针对每一个剧本分镜进行详细的检查。
         1. 调用敌对视角攻击（普通观众、竞品编剧、原著粉）。
         2. 进行量化打分。
         3. 7分以下的项目必须立即给出修改版！
+        
+        小说原文参考：
+        {st.session_state.novel_content}
         """
         chat_with_ai(check_prompt)
 
@@ -163,7 +183,20 @@ st.divider()
 # ==========================================
 # 6. 对话历史展示区
 # ==========================================
-st.subheader("💬 创作记录面板")
+col_title, col_download = st.columns([3, 1])
+with col_title:
+    st.subheader("💬 创作记录面板")
+with col_download:
+    # 如果系统有最新生成的回复，展示下载按钮
+    if st.session_state.last_ai_response:
+        st.download_button(
+            label="💾 将最新结果下载为 TXT",
+            data=st.session_state.last_ai_response,
+            file_name="微短剧生成_或_自检结果.txt",
+            mime="text/plain",
+            use_container_width=True
+        )
+
 # 过滤掉系统提示词，只展示用户和AI的对话
 for msg in st.session_state.messages:
     if msg["role"] != "system":
