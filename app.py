@@ -169,9 +169,24 @@ with control_cols[1]:
         chat_with_ai("已确认角色驱动卡。请执行【第2轮：开场手法设计】。")
 
 with control_cols[2]:
-    episode_num = st.number_input("集数设置", min_value=1, max_value=100, value=1, label_visibility="collapsed")
+    episode_num = st.number_input("集数", min_value=1, value=1, label_visibility="collapsed")
+    # 新增：剧情范围锚定
+    plot_focus = st.text_input("本集剧情范围(防流水账):", placeholder="例：只写前30%女主被刁难的情节")
+    
     if st.button(f"🎥 第3轮：生成第 {episode_num} 集", use_container_width=True):
-        chat_with_ai(f"开始生成剧本 第{episode_num}集。请严格执行【第3轮：剧本生成】的前置A、B、C、D并输出10-15个分镜。小说原文参考（如需）：\n{st.session_state.novel_content}")
+        prompt = f"""
+        开始生成剧本 第{episode_num}集。
+        
+        【剧情进度锚定】：本集只允许推进以下剧情：{plot_focus if plot_focus else '根据原文合理推进单集容量'}。绝对禁止剧情快进或流水账！
+        
+        【核心人设依据】：
+        {st.session_state.global_setting}
+        
+        请严格执行【第3轮：剧本生成】的前置A、B、C、D并输出10-15个分镜。
+        小说原文参考（请结合范围提取细节）：\n{st.session_state.novel_content}
+        """
+        chat_with_ai(prompt)
+
 
 with control_cols[3]:
     if st.button("🔍 第4轮：原著对比自检", use_container_width=True):
