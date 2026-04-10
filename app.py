@@ -145,6 +145,7 @@ with st.expander("📝 步骤一：导入小说章节原文 (防文字转文字�
 
 # 面板2：系统工作流控制台
 st.markdown("### ⚙️ 编剧工作流控制台")
+control_cols = st.columns(4)
 if "global_setting" not in st.session_state:
     st.session_state.global_setting = "暂无全局设定，请先执行第1轮提炼，然后把觉得好的设定复制到这里备用。"
 
