@@ -329,16 +329,19 @@ with st.sidebar:
         "deepseek-reasoner",
         "gpt-4o",
         "claude-3-5-sonnet-20241022",
-        "custom",
+        "✍️ 自定义模型",
     ]
 
     selected_model = st.selectbox("选择常用模型", model_options)
 
-    if selected_model == "custom":
+    if selected_model == "✍️ 自定义模型":
         model_name = st.text_input(
-            "请输入模型ID",
+            "请输入中转站对应的模型ID",
             value="deepseek-chat",
-            help="请参考中转站后台支持的模型名称列表"
+            help=(
+                "请参考 yunwu.ai 或你的中转站后台支持的模型名称列表, "
+                "例如: gpt-4-turbo, claude-3-opus-20240229 等"
+            )
         )
     else:
         model_name = selected_model
