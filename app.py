@@ -145,25 +145,44 @@ with st.expander("📝 步骤一：导入小说章节原文 (防文字转文字�
 
 # 面板2：系统工作流控制台
 st.markdown("### ⚙️ 编剧工作流控制台")
+if "global_setting" not in st.session_state:
+    st.session_state.global_setting = "暂无全局设定，请先执行第1轮提炼，然后把觉得好的设定复制到这里备用。"
+
+with st.expander("🧠 全局驱动卡与设定库 (允许人工修改)", expanded=False):
+    st.session_state.global_setting = st.text_area(
+        "在此修改或粘贴AI提炼的角色人设，后续生成将严格以此为准：", 
+        value=st.session_state.global_setting, 
+        height=200
+    )
+
 control_cols = st.columns(4)
 
 with control_cols[0]:
     if st.button("🚀 第1轮：全局提炼", use_container_width=True):
-        if not st.session_state.novel_content:
-            st.warning("请先在上方录入小说内容！")
-        else:
-            prompt = f"【微短剧3.1启动】\n以下为当前系统内的小说内容，请执行【第1轮：全局提炼】。\n\n小说内容如下：\n{st.session_state.novel_content}"
-            chat_with_ai(prompt)
+        # ... (原代码不变)
 
 with control_cols[1]:
     if st.button("🎬 第2轮：设计开场", use_container_width=True):
-        chat_with_ai("已确认角色驱动卡。请执行【第2轮：开场手法设计】。")
+        # ... (原代码不变)
 
 with control_cols[2]:
-    episode_num = st.number_input("集数设置", min_value=1, max_value=100, value=1, label_visibility="collapsed")
+    episode_num = st.number_input("集数", min_value=1, value=1, label_visibility="collapsed")
+    # 新增：剧情范围锚定
+    plot_focus = st.text_input("本集剧情范围(防流水账):", placeholder="例：只写前30%女主被刁难的情节")
+    
     if st.button(f"🎥 第3轮：生成第 {episode_num} 集", use_container_width=True):
-        chat_with_ai(f"开始生成剧本 第{episode_num}集。请严格执行【第3轮：剧本生成】的前置A、B、C、D并输出10-15个分镜。小说原文参考（如需）：\n{st.session_state.novel_content}")
-
+        prompt = f"""
+        开始生成剧本 第{episode_num}集。
+        
+        【剧情进度锚定】：本集只允许推进以下剧情：{plot_focus if plot_focus else '根据原文合理推进单集容量'}。绝对禁止剧情快进或流水账！
+        
+        【核心人设依据】：
+        {st.session_state.global_setting}
+        
+        请严格执行【第3轮：剧本生成】的前置A、B、C、D并输出10-15个分镜。
+        小说原文参考（请结合范围提取细节）：\n{st.session_state.novel_content}
+        """
+        chat_with_ai(prompt)
 with control_cols[3]:
     if st.button("🔍 第4轮：自检并输出最终剧本", use_container_width=True):
         check_prompt = f"""
