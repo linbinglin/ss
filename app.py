@@ -145,7 +145,6 @@ with st.expander("📝 步骤一：导入小说章节原文 (防文字转文字�
 
 # 面板2：系统工作流控制台
 st.markdown("### ⚙️ 编剧工作流控制台")
-control_cols = st.columns(4)
 if "global_setting" not in st.session_state:
     st.session_state.global_setting = "暂无全局设定，请先执行第1轮提炼，然后把觉得好的设定复制到这里备用。"
 
@@ -155,55 +154,38 @@ with st.expander("🧠 全局驱动卡与设定库 (允许人工修改)", expand
         value=st.session_state.global_setting, 
         height=200
     )
-
 control_cols = st.columns(4)
 
 with control_cols[0]:
     if st.button("🚀 第1轮：全局提炼", use_container_width=True):
-        # ... (原代码不变)
+        if not st.session_state.novel_content:
+            st.warning("请先在上方录入小说内容！")
+        else:
+            prompt = f"【微短剧3.1启动】\n以下为当前系统内的小说内容，请执行【第1轮：全局提炼】。\n\n小说内容如下：\n{st.session_state.novel_content}"
+            chat_with_ai(prompt)
 
 with control_cols[1]:
     if st.button("🎬 第2轮：设计开场", use_container_width=True):
-        # ... (原代码不变)
+        chat_with_ai("已确认角色驱动卡。请执行【第2轮：开场手法设计】。")
 
 with control_cols[2]:
-    episode_num = st.number_input("集数", min_value=1, value=1, label_visibility="collapsed")
-    # 新增：剧情范围锚定
-    plot_focus = st.text_input("本集剧情范围(防流水账):", placeholder="例：只写前30%女主被刁难的情节")
-    
+    episode_num = st.number_input("集数设置", min_value=1, max_value=100, value=1, label_visibility="collapsed")
     if st.button(f"🎥 第3轮：生成第 {episode_num} 集", use_container_width=True):
-        prompt = f"""
-        开始生成剧本 第{episode_num}集。
-        
-        【剧情进度锚定】：本集只允许推进以下剧情：{plot_focus if plot_focus else '根据原文合理推进单集容量'}。绝对禁止剧情快进或流水账！
-        
-        【核心人设依据】：
-        {st.session_state.global_setting}
-        
-        请严格执行【第3轮：剧本生成】的前置A、B、C、D并输出10-15个分镜。
-        小说原文参考（请结合范围提取细节）：\n{st.session_state.novel_content}
-        """
-        chat_with_ai(prompt)
+        chat_with_ai(f"开始生成剧本 第{episode_num}集。请严格执行【第3轮：剧本生成】的前置A、B、C、D并输出10-15个分镜。小说原文参考（如需）：\n{st.session_state.novel_content}")
+
 with control_cols[3]:
-    if st.button("🔍 第4轮：自检并输出最终剧本", use_container_width=True):
+    if st.button("🔍 第4轮：原著对比自检", use_container_width=True):
         check_prompt = f"""
         请严格执行【第4轮：自检与优化】。
         对比刚刚生成的剧本与我上传的小说原文，针对每一个剧本分镜进行详细的检查。
-        
-        第一步：简要展示敌对视角攻击和量化打分。
-        第二步（🚨核心要求）：结合打分和修改建议，**请务必将优化后的【完整剧本】重新输出一遍！**
-        
-        输出最终剧本时，必须严格遵守以下格式，绝对不准用一两句话概括（禁止偷懒）：
-        【分镜X】
-        场景：...
-        画面+台词：(必须包含3个连续动作、详细的视觉描写、环境音效等，严格遵循视觉翻译法则)
-        衔接点：...
+        1. 调用敌对视角攻击（普通观众、竞品编剧、原著粉）。
+        2. 进行量化打分。
+        3. 7分以下的项目必须立即给出修改版！
         
         小说原文参考：
         {st.session_state.novel_content}
         """
         chat_with_ai(check_prompt)
-
 st.divider()
 
 # ==========================================
