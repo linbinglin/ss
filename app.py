@@ -342,6 +342,19 @@ with st.sidebar:
         st.session_state.chapter_analysis = ""
         st.session_state.selected_segments = ""
         st.success("记忆已清空, 系统已重置为初始状态。")
+       st.markdown("---")
+    st.header("💾 快捷导出")
+    if st.session_state.get("last_ai_response"):
+        st.download_button(
+            label="📥 下载最新 TXT 文本",
+            data=st.session_state.last_ai_response,
+            file_name="微短剧生成脚本.txt",
+            mime="text/plain",
+            use_container_width=True,
+            type="primary" # 让侧边栏按钮变醒目
+        )
+    else:
+        st.button("📥 暂无内容可下载", disabled=True, use_container_width=True)
 
 # ==========================================
 # 4. 核心对话逻辑
@@ -830,13 +843,24 @@ with control_cols[3]:
             "- 时长准确度"
             "(标注时长与内容实算时长偏差是否<=+-2秒): ___\n"
             "- 分镜密度"
-            "(每个10-14秒分镜是否>=3个动作事件+>=2次景别变化): ___\n"
+            "(每个10-14秒分镜是否>=4个动作事件+>=4次景别变化): ___\n"
             "- 视觉翻译完成度"
             "(是否有任何一处在用台词替代画面叙事): ___\n"
             "- 聚焦范围遵守度(是否所有分镜都在指定范围内): ___\n"
             "7分以下的项目必须立即修改并输出修改版。"
         )
         chat_with_ai(check_prompt)
+if st.session_state.get("last_ai_response"):
+    st.markdown("<br>", unsafe_allow_html=True) # 加一点空隙让排版更好看
+    st.success("✅ AI 任务执行完毕！您可以直接下载最新结果，或在下方查看历史记录：")
+    st.download_button(
+        label="💾 一键下载最新生成的 TXT 剧本",
+        data=st.session_state.last_ai_response,
+        file_name="微短剧生成_或_自检结果.txt",
+        mime="text/plain",
+        use_container_width=True,
+        type="primary"  # type="primary" 会让这个按钮变成非常显眼的主题色（通常是红色/蓝色）
+    )
 
 st.divider()
 
@@ -846,16 +870,6 @@ st.divider()
 col_title, col_download = st.columns([3, 1])
 with col_title:
     st.subheader("💬 创作记录面板")
-with col_download:
-    if st.session_state.last_ai_response:
-        st.download_button(
-            label="💾 将最新结果下载为 TXT",
-            data=st.session_state.last_ai_response,
-            file_name="script_output.txt",
-            mime="text/plain",
-            use_container_width=True
-        )
-
 for msg in st.session_state.messages:
     if msg["role"] != "system":
         with st.chat_message(msg["role"]):
