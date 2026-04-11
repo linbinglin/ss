@@ -334,13 +334,31 @@ with st.sidebar:
     st.markdown("---")
     st.header("🧠 全局记忆管理")
     st.caption("如果你发现AI遗忘了, 可以在此点击清空重置。")
-    if st.button("🗑️ 清空所有对话记忆", use_container_width=True):
+    if st.button("🗑️ 清空所有对话记忆与文本", use_container_width=True):
+        # 1. 恢复初始系统提示词
         st.session_state.messages = [
             {"role": "system", "content": SYSTEM_PROMPT}
         ]
+        # 2. 清空步骤二的分析内容
         st.session_state.chapter_analysis = ""
         st.session_state.selected_segments = ""
-        st.success("记忆已清空, 系统已重置为初始状态。")
+        
+        # 3. 【新增】彻底清空小说原稿内存
+        st.session_state.novel_content = ""
+        
+        # 4. 【新增】还原全局人设设定库
+        st.session_state.global_setting = (
+            "暂无全局设定, 请先执行第1轮提炼, "
+            "然后把觉得好的设定复制到这里备用。"
+        )
+        
+        # 5. 【新增】清空最后一次AI的回复记录
+        st.session_state.last_ai_response = ""
+        
+        st.success("🧹 所有小说文本、人设记忆和对话已彻底清空，防止干扰！")
+        
+        # 强制页面重新加载，让文本框立刻变空白
+        st.rerun()
         
     st.markdown("---")  # 将这里的缩进改成4个空格，和下一行对齐
     st.header("💾 快捷导出")
