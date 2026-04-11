@@ -342,7 +342,8 @@ with st.sidebar:
         st.session_state.chapter_analysis = ""
         st.session_state.selected_segments = ""
         st.success("记忆已清空, 系统已重置为初始状态。")
-       st.markdown("---")
+        
+    st.markdown("---")  # 将这里的缩进改成4个空格，和下一行对齐
     st.header("💾 快捷导出")
     if st.session_state.get("last_ai_response"):
         st.download_button(
