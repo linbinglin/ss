@@ -405,15 +405,20 @@ def chat_with_ai(prompt):
                     full_response += chunk.choices[0].delta.content
                     message_placeholder.markdown(full_response + "▌")
             message_placeholder.markdown(full_response)
-        except Exception as e:
+       except Exception as e:
             st.error(f"API 请求失败: {e}")
             st.session_state.messages.pop()
             return
 
+    # 保存 AI 的回复到聊天记录中
     st.session_state.messages.append(
         {"role": "assistant", "content": full_response}
     )
+    # 更新最新一次的文本结果（用于下载）
     st.session_state.last_ai_response = full_response
+    
+    # 【新增这一行】：强制刷新页面状态，让左侧边栏的下载按钮立刻获取到这部分最新文本！
+    st.rerun()
 
 # ==========================================
 # 5. 主工作区
