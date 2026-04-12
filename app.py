@@ -628,7 +628,29 @@ def remove_chapter(name):
 def get_combined_text(names=None):
     if names is None: names = st.session_state.chapter_order
     return "\n\n".join(f"【{n}】\n{st.session_state.chapters[n]}" for n in names if n in st.session_state.chapters)
-
+def extract_last_shot(episode_text):
+    """从剧本文本中提取最后一个分镜的内容"""
+    if not episode_text:
+        return ""
+    # 匹配所有分镜标记
+    shots = re.split(r'(【分镜\s*\d+】)', episode_text)
+    if len(shots) < 2:
+        # 没找到分镜标记，取最后500字
+        return episode_text[-500:].strip()
+    # 取最后一个分镜标记及其后面的内容
+    last_shot_header = ""
+    last_shot_content = ""
+    for i in range(len(shots) - 1, -1, -1):
+        if re.match(r'【分镜\s*\d+】', shots[i]):
+            last_shot_header = shots[i]
+            last_shot_content = shots[i + 1] if i + 1 < len(shots) else ""
+            break
+    result = (last_shot_header + last_shot_content).strip()
+    # 如果结果太长，截断
+    if len(result) > 800:
+        result = result[:800] + "..."
+    return result
+    
 # ============================================================
 # Prompt构建
 # ============================================================
@@ -656,7 +678,7 @@ def build_opening_prompt():
 - 前30秒逐秒画面描述
 - 30秒后如何衔接主线"""
 
-def build_episode_prompt(ep, text, opening=""):
+def build_episode_prompt(ep, text, opening="", last_shot=""):
     mem = st.session_state.memory
     mem_str = ""
     if mem.get("storyline"):
@@ -669,8 +691,37 @@ def build_episode_prompt(ep, text, opening=""):
 📌 引爆：{mem['next_foreshadow']}
 📌 情绪：{mem['emotion_track']}"""
 
+    # 构建衔接指令
+    bridging = ""
+    if last_shot and last_shot.strip():
+        bridging = f"""
+═══════════════════════════════════════
+🔗 上集衔接（必须遵守）
+═══════════════════════════════════════
+以下是上一集（第{ep-1}集）的最后一个分镜：
+
+{last_shot.strip()}
+
+【衔接要求】
+1. 本集第一个分镜必须在时间/空间/情绪上承接上面这个镜头
+2. 上一镜的「衔接点」描述的画面，就是本集第一个分镜的开场画面
+3. 不能出现时间跳跃或场景突变（除非上一镜的衔接点明确指向了场景转换）
+4. 上集结尾的情绪基调要延续到本集开头，再自然地发展或转变
+5. 如果上一镜埋了伏笔或悬念，本集前3个分镜内必须有回应或推进
+"""
+    else:
+        if ep > 1:
+            bridging = """
+═══════════════════════════════════════
+🔗 衔接说明
+═══════════════════════════════════════
+用户未提供上集末尾内容。本集视为新篇章开头，可以自由设计开场。
+但仍需参考全局记忆中的进度和伏笔信息。
+"""
+
     return f"""请执行【第3轮：剧本生成】—— 第{ep}集
 {mem_str}
+{bridging}
 {"选择的开场方案：" + opening if opening else ""}
 
 参考小说原文：
@@ -678,35 +729,22 @@ def build_episode_prompt(ep, text, opening=""):
 
 严格执行前置ABCD，然后输出完整分镜剧本。
 
-【分镜格式强制要求——必须严格遵守】
-
-1. 台词必须嵌入画面动作流中，出现在它被说出的精确时间位置
-   不允许把台词单独放在画面描写下面！
-
-2. 每句台词前面必须紧跟说话者的：
-   - 情绪/语气（低沉/暴怒/故作轻松/嘴硬但声音发颤……）
-   - 面部表情（挑眉/眼神躲闪/下颌收紧/嘴角抽搐……）
-   - 身体动作（双手插兜/侧过头/攥拳……）
-   至少写两个。
-
-3. 每个分镜必须实算时长：
-   - 简单动作=0.5-1s，完整动作=2-3s
-   - 台词每3字≈1.5s，表情反应=1-1.5s
-   - 逐个相加，标注总时长
-   - 每个分镜目标10-14秒
-
+【分镜格式强制要求】
+1. 台词必须嵌入画面动作流，出现在被说出的精确时间位置
+2. 每句台词前紧跟说话者的情绪/表情/身体状态（至少两个）
+3. 每个分镜实算时长（逐项相加，目标10-14秒）
 4. 内心OS出现在角色产生想法的那个时刻
-5. 音效用（）标注在发声动作旁边
+5. 音效用（）标注在发声动作旁
 
 示范格式：
 【分镜XX】（实算Xs）
 场景：地点 · 时间 · 天气 · 光线
 
-[角色动作描写]（Xs）——
-[继续动作/变化]（Xs）（音效：xxx）。
-角色A（情绪描写+表情+身体状态）："台词内容"（Xs）
-[另一角色的反应动作]（Xs）。
-角色B OS：（内心独白内容）（Xs）
+[角色动作]（Xs）——
+[变化/发展]（Xs）（音效：xxx）。
+角色A（情绪+表情+身体）："台词"（Xs）
+[另一角色反应]（Xs）。
+角色B OS：（内心独白）（Xs）
 
 衔接点：[最后画面 → 下一镜]"""
 
@@ -988,6 +1026,29 @@ with t3:
     ad=bool(st.session_state.global_analysis)
     st.markdown(f"""<div style="display:flex;gap:8px;padding-top:24px;flex-wrap:wrap;">
 <span class="tag tag-blue">第{en}集</span><span class="tag tag-purple">{get_active_model()}</span>
+{"<span class='tag tag-green'>✅</span>" if ad else "<span class='tag tag-yellow'>⚠️</span>"}</div>""",unsafe_allow_html=True)
+
+# ─── 上集衔接区 ───
+auto_last_shot = ""
+prev_ep = en - 1
+if prev_ep > 0 and prev_ep in st.session_state.episodes:
+    auto_last_shot = extract_last_shot(st.session_state.episodes[prev_ep])
+
+with st.expander(f"🔗 上集衔接（第{prev_ep}集 → 第{en}集）", expanded=bool(auto_last_shot)):
+    if auto_last_shot:
+        st.caption(f"✅ 已自动提取第{prev_ep}集最后一个分镜，你可以编辑或清空")
+    else:
+        st.caption("💡 留空 = 第一集或新篇章开始，不需要衔接上集")
+    
+    last_shot_input = st.text_area(
+        "上集末尾分镜内容",
+        value=auto_last_shot,
+        height=120,
+        key="last_shot_input",
+        placeholder="粘贴上一集最后一个分镜的内容...\n留空则视为新篇章开头，不做衔接。",
+        help="系统会自动提取已生成的上一集末尾分镜。你也可以手动粘贴外部剧本的末尾内容。"
+    )
+<span class="tag tag-blue">第{en}集</span><span class="tag tag-purple">{get_active_model()}</span>
 {"<span class='tag tag-green'>✅提炼</span>" if ad else "<span class='tag tag-yellow'>⚠️未提炼</span>"}</div>""",unsafe_allow_html=True)
 
 bc=st.columns(7)
@@ -1016,7 +1077,8 @@ with mt[0]:
         if not ad: st.warning("⚠️ 先提炼")
         else:
             tx=get_combined_text(ec if ec else None); op=st.session_state.get("selected_opening","")
-            pr=build_episode_prompt(en,tx,op); cx=st.session_state.messages+[{"role":"user","content":pr}]
+            last_shot = st.session_state.get("last_shot_input", "")  # 读取衔接框内容
+pr=build_episode_prompt(en, tx, op, last_shot); cx=st.session_state.messages+[{"role":"user","content":pr}]
             with st.spinner(f"🎬 第{en}集..."):
                 r=call_api_streaming(cx)
                 if r:
@@ -1034,7 +1096,11 @@ with mt[0]:
                 tx=get_combined_text(ec if ec else None)
                 for e in range(int(bs),int(be)+1):
                     st.markdown(f"---\n### 🎬 第{e}集")
-                    cx=st.session_state.messages+[{"role":"user","content":build_episode_prompt(e,tx)}]
+                    # 批量生成时，自动从上一集提取衔接
+batch_last_shot = ""
+if e > 1 and (e-1) in st.session_state.episodes:
+    batch_last_shot = extract_last_shot(st.session_state.episodes[e-1])
+cx=st.session_state.messages+[{"role":"user","content":build_episode_prompt(e, tx, "", batch_last_shot)}]
                     r=call_api_streaming(cx)
                     if r:
                         co=st.empty();f=stream_to_container(r,co)
