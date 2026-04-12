@@ -492,8 +492,10 @@ def call_api_streaming(messages, system_prompt=SYSTEM_PROMPT):
     except requests.exceptions.HTTPError as e:
         code = e.response.status_code if e.response is not None else "?"
         body = ""
-        try: body = e.response.text[:500] if e.response is not None else ""
-        except: pass
+        try:
+            body = e.response.text[:500] if e.response is not None else ""
+        except:
+            pass
         st.error(f"❌ HTTP {code}: {body}")
         return None
     except Exception as e:
@@ -501,26 +503,39 @@ def call_api_streaming(messages, system_prompt=SYSTEM_PROMPT):
         return None
 
 def process_stream(response):
-    if response is None: return
+    if response is None:
+        return
     try:
         for line in response.iter_lines():
-            if not line: continue
-            try: line_str = line.decode("utf-8")
-            except: continue
-            if not line_str.startswith("data: "): continue
+            if not line:
+                continue
+            try:
+                line_str = line.decode("utf-8")
+            except:
+                continue
+            if not line_str.startswith("data: "):
+                continue
             data_str = line_str[6:].strip()
-            if data_str == "[DONE]": break
-            if not data_str: continue
-            try: data = json.loads(data_str)
-            except json.JSONDecodeError: continue
+            if data_str == "[DONE]":
+                break
+            if not data_str:
+                continue
+            try:
+                data = json.loads(data_str)
+            except json.JSONDecodeError:
+                continue
             choices = data.get("choices")
-            if not choices or not isinstance(choices, list) or len(choices) == 0: continue
+            if not choices or not isinstance(choices, list) or len(choices) == 0:
+                continue
             first = choices[0]
-            if not isinstance(first, dict): continue
+            if not isinstance(first, dict):
+                continue
             delta = first.get("delta")
-            if not delta or not isinstance(delta, dict): continue
+            if not delta or not isinstance(delta, dict):
+                continue
             content = delta.get("content")
-            if content: yield content
+            if content:
+                yield content
     except requests.exceptions.ChunkedEncodingError:
         st.warning("⚠️ 传输中断，已保存内容")
     except requests.exceptions.ConnectionError:
@@ -529,7 +544,8 @@ def process_stream(response):
         st.warning(f"⚠️ {type(e).__name__}: {e}")
 
 def stream_to_container(response, container):
-    if response is None: return ""
+    if response is None:
+        return ""
     full = ""
     for chunk in process_stream(response):
         full += chunk
@@ -540,7 +556,8 @@ def call_api_non_streaming(messages, system_prompt=SYSTEM_PROMPT):
     api_key = st.session_state.api_key
     api_base = st.session_state.api_base.rstrip("/")
     model = get_active_model()
-    if not api_key or not api_base: return None
+    if not api_key or not api_base:
+        return None
     headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
     data = {
         "model": model,
@@ -552,7 +569,8 @@ def call_api_non_streaming(messages, system_prompt=SYSTEM_PROMPT):
         resp.raise_for_status()
         result = resp.json()
         choices = result.get("choices")
-        if not choices or len(choices) == 0: return None
+        if not choices or len(choices) == 0:
+            return None
         return choices[0].get("message", {}).get("content", "")
     except Exception as e:
         st.error(f"❌ {type(e).__name__}: {e}")
@@ -576,8 +594,21 @@ def remove_chapter(name):
             st.session_state.chapter_order.remove(name)
 
 def get_combined_text(names=None):
-    if names is None: names = st.session_state.chapter_order
+    if names is None:
+        names = st.session_state.chapter_order
     return "\n\n".join(f"【{n}】\n{st.session_state.chapters[n]}" for n in names if n in st.session_state.chapters)
+
+# ============================================================
+# 自动提取末尾分镜（新增功能）
+# ============================================================
+def extract_last_scenes(script, n=2):
+    """从剧本中自动提取最后n个分镜"""
+    scenes = re.split(r'(?=【分镜\s*\d+】)', script)
+    scenes = [s.strip() for s in scenes if s.strip() and '【分镜' in s]
+    if not scenes:
+        return ""
+    last_scenes = scenes[-n:]
+    return "\n\n".join(last_scenes)
 
 # ============================================================
 # Prompt构建
@@ -786,15 +817,6 @@ def build_emotion_optimization_prompt(ep, script):
 
 输出优化后完整剧本，修改处标注【❤️】。"""
 
-def extract_last_scenes(script, n=2):
-    """从剧本中自动提取最后n个分镜"""
-    scenes = re.split(r'(?=【分镜\s*\d+】)', script)
-    scenes = [s.strip() for s in scenes if s.strip() and '【分镜' in s]
-    if not scenes:
-        return ""
-    last_scenes = scenes[-n:]
-    return "\n\n".join(last_scenes)
-
 # ============================================================
 # 侧边栏
 # ============================================================
@@ -813,7 +835,7 @@ with st.sidebar:
         "gpt-4o", "gpt-4o-mini", "gpt-4-turbo", "o3-mini",
         "gemini-2.5-pro-preview-06-05", "自定义模型"
     ]
-    cm1, cm2 = st.columns([3,1])
+    cm1, cm2 = st.columns([3, 1])
     with cm1:
         sel = st.selectbox("生成模型", model_options,
             index=model_options.index(st.session_state.model_id) if st.session_state.model_id in model_options else 0, key="sb_m")
@@ -822,7 +844,7 @@ with st.sidebar:
         st.markdown("<br>", unsafe_allow_html=True)
         if st.button("🔗", key="sb_t", use_container_width=True, help="测试"):
             with st.spinner("..."):
-                r = call_api_non_streaming([{"role":"user","content":"回复OK"}], "你是助手。")
+                r = call_api_non_streaming([{"role": "user", "content": "回复OK"}], "你是助手。")
                 st.success("✅") if r else st.error("❌")
     if sel == "自定义模型":
         cm = st.text_input("模型ID", value=st.session_state.custom_model, key="sb_c", placeholder="deepseek-v3")
@@ -842,19 +864,21 @@ with st.sidebar:
         st.session_state["show_memory_modal"] = True
     if st.session_state.episodes:
         st.download_button("📦 导出全部", use_container_width=True, key="sb_ex",
-            data=json.dumps({"analysis":st.session_state.global_analysis,
-                "episodes":{str(k):v for k,v in st.session_state.episodes.items()},
-                "reviews":{str(k):v for k,v in st.session_state.review_results.items()},
-                "memory":st.session_state.memory}, ensure_ascii=False, indent=2),
+            data=json.dumps({"analysis": st.session_state.global_analysis,
+                "episodes": {str(k): v for k, v in st.session_state.episodes.items()},
+                "reviews": {str(k): v for k, v in st.session_state.review_results.items()},
+                "memory": st.session_state.memory}, ensure_ascii=False, indent=2),
             file_name=f"剧本_{datetime.now().strftime('%m%d_%H%M')}.json", mime="application/json")
     if st.button("🗑️ 重置", use_container_width=True, key="sb_rs"):
-        for k in list(st.session_state.keys()): del st.session_state[k]
-        init_session_state(); st.rerun()
+        for k in list(st.session_state.keys()):
+            del st.session_state[k]
+        init_session_state()
+        st.rerun()
 
 # ============================================================
 # 顶部
 # ============================================================
-step_names = ["导入章节","全局提炼","开场设计","生成剧本","质检优化"]
+step_names = ["导入章节", "全局提炼", "开场设计", "生成剧本", "质检优化"]
 current = st.session_state.current_step
 st.markdown(f"""<div class="header-bar"><div class="header-left">
 <div class="header-title">🎬 影视化视觉翻译引擎 V3.2</div>
@@ -865,9 +889,9 @@ st.markdown(f"""<div class="header-bar"><div class="header-left">
 <span class="header-badge">🤖 {get_active_model()}</span></div></div>""", unsafe_allow_html=True)
 
 sh = ""
-for i,n in enumerate(step_names):
-    c = "done" if i<current else ("active" if i==current else "")
-    ic = "✓" if i<current else str(i+1)
+for i, n in enumerate(step_names):
+    c = "done" if i < current else ("active" if i == current else "")
+    ic = "✓" if i < current else str(i + 1)
     sh += f'<div class="step-item {c}"><span class="step-num">{ic}</span>{n}</div>'
 st.markdown(f'<div class="step-indicator">{sh}</div>', unsafe_allow_html=True)
 
@@ -883,7 +907,9 @@ if st.session_state.get("show_memory_modal"):
 <div class="memory-item"><span class="memory-key">💥 引爆：</span><span class="memory-val">{mem.get('next_foreshadow') or '—'}</span></div>
 <div class="memory-item"><span class="memory-key">❤️ 情绪：</span><span class="memory-val">{mem.get('emotion_track') or '—'}</span></div>
 </div>""", unsafe_allow_html=True)
-        if st.button("关闭",key="cmm"): st.session_state["show_memory_modal"]=False; st.rerun()
+        if st.button("关闭", key="cmm"):
+            st.session_state["show_memory_modal"] = False
+            st.rerun()
 
 # ============================================================
 # 步骤一
@@ -892,47 +918,60 @@ st.markdown("""<div class="card"><div class="card-header">
 <span class="card-icon">📖</span><span class="card-title">步骤一：导入小说章节</span>
 <span class="card-subtitle">.txt/.md 上传 或 粘贴</span></div></div>""", unsafe_allow_html=True)
 
-ca, cl = st.columns([1,1])
+ca, cl = st.columns([1, 1])
 with ca:
-    at = st.tabs(["📁 上传","✍️ 粘贴"])
+    at = st.tabs(["📁 上传", "✍️ 粘贴"])
     with at[0]:
-        up = st.file_uploader("选择",type=["txt","md","text"],accept_multiple_files=True,key="up")
+        up = st.file_uploader("选择", type=["txt", "md", "text"], accept_multiple_files=True, key="up")
         if up:
             for u in up:
-                if u.size>200*1024: st.warning(f"⚠️ {u.name}>200KB"); continue
-                try: ct=u.read().decode("utf-8",errors="ignore")
-                except: ct=""
-                cn=u.name.rsplit(".",1)[0] if "." in u.name else u.name
+                if u.size > 200 * 1024:
+                    st.warning(f"⚠️ {u.name}>200KB")
+                    continue
+                try:
+                    ct = u.read().decode("utf-8", errors="ignore")
+                except:
+                    ct = ""
+                cn = u.name.rsplit(".", 1)[0] if "." in u.name else u.name
                 if cn not in st.session_state.chapters and ct:
-                    add_chapter(cn,ct); st.success(f"✅ {cn} ({len(ct)}字)")
+                    add_chapter(cn, ct)
+                    st.success(f"✅ {cn} ({len(ct)}字)")
     with at[1]:
-        pn=st.text_input("名称",placeholder="第1章",key="pn")
-        pc=st.text_area("内容",height=180,placeholder="粘贴...",key="pc")
-        if st.button("➕ 添加",key="pa",use_container_width=True,type="primary"):
-            if pn and pc: add_chapter(pn,pc); st.success(f"✅ {pn}"); st.rerun()
-            else: st.warning("请填写")
+        pn = st.text_input("名称", placeholder="第1章", key="pn")
+        pc = st.text_area("内容", height=180, placeholder="粘贴...", key="pc")
+        if st.button("➕ 添加", key="pa", use_container_width=True, type="primary"):
+            if pn and pc:
+                add_chapter(pn, pc)
+                st.success(f"✅ {pn}")
+                st.rerun()
+            else:
+                st.warning("请填写")
 
 with cl:
     st.markdown("**已导入**")
     if st.session_state.chapter_order:
-        tc=sum(len(st.session_state.chapters.get(c,"")) for c in st.session_state.chapter_order)
+        tc = sum(len(st.session_state.chapters.get(c, "")) for c in st.session_state.chapter_order)
         st.markdown(f"""<div class="stats-bar">
 <div class="stat-item"><div class="stat-value">{len(st.session_state.chapter_order)}</div><div class="stat-label">章节</div></div>
 <div class="stat-item"><div class="stat-value">{tc:,}</div><div class="stat-label">总字</div></div>
-<div class="stat-item"><div class="stat-value">{tc//max(len(st.session_state.chapter_order),1):,}</div><div class="stat-label">均字</div></div>
+<div class="stat-item"><div class="stat-value">{tc // max(len(st.session_state.chapter_order), 1):,}</div><div class="stat-label">均字</div></div>
 </div>""", unsafe_allow_html=True)
-        for i,ch in enumerate(st.session_state.chapter_order):
-            ct=st.session_state.chapters.get(ch,"")
-            c1,c2,c3=st.columns([5,1,1])
-            with c1: st.markdown(f"""<div class="chapter-item"><div class="chapter-icon">{i+1}</div>
+        for i, ch in enumerate(st.session_state.chapter_order):
+            ct = st.session_state.chapters.get(ch, "")
+            c1, c2, c3 = st.columns([5, 1, 1])
+            with c1:
+                st.markdown(f"""<div class="chapter-item"><div class="chapter-icon">{i + 1}</div>
 <div class="chapter-info"><div class="chapter-name">{ch}</div><div class="chapter-meta">{len(ct):,}字</div></div></div>""", unsafe_allow_html=True)
             with c2:
-                if st.button("👁️",key=f"v{i}",help="看"):
-                    st.session_state[f"e{i}"]=not st.session_state.get(f"e{i}",False)
+                if st.button("👁️", key=f"v{i}", help="看"):
+                    st.session_state[f"e{i}"] = not st.session_state.get(f"e{i}", False)
             with c3:
-                if st.button("🗑️",key=f"d{i}",help="删"): remove_chapter(ch); st.rerun()
+                if st.button("🗑️", key=f"d{i}", help="删"):
+                    remove_chapter(ch)
+                    st.rerun()
             if st.session_state.get(f"e{i}"):
-                with st.expander(f"📖 {ch}",expanded=True): st.text_area("",ct,height=200,disabled=True,key=f"p{i}")
+                with st.expander(f"📖 {ch}", expanded=True):
+                    st.text_area("", ct, height=200, disabled=True, key=f"p{i}")
     else:
         st.markdown("""<div class="empty-state"><div class="empty-icon">📚</div><div class="empty-text">暂无</div></div>""", unsafe_allow_html=True)
 
@@ -943,37 +982,46 @@ st.markdown("""<div class="card"><div class="card-header">
 <span class="card-icon">🔍</span><span class="card-title">步骤二：全局提炼</span>
 <span class="card-subtitle">角色驱动卡 · 情节 · 视觉</span></div></div>""", unsafe_allow_html=True)
 
-s2a,s2b=st.columns([1,1])
+s2a, s2b = st.columns([1, 1])
 with s2a:
     if st.session_state.chapter_order:
-        sc=st.multiselect("选择章节",st.session_state.chapter_order,default=st.session_state.chapter_order,key="sc",label_visibility="collapsed")
-        st.session_state.selected_chapters_for_analysis=sc
-        if sc: st.info(f"📊 {len(sc)}章 · {sum(len(st.session_state.chapters.get(c,'')) for c in sc):,}字")
-        b1,b2=st.columns(2)
-        with b1: da=st.button("🚀 提炼",key="da",use_container_width=True,type="primary",disabled=not(sc and st.session_state.api_key))
+        sc = st.multiselect("选择章节", st.session_state.chapter_order, default=st.session_state.chapter_order, key="sc", label_visibility="collapsed")
+        st.session_state.selected_chapters_for_analysis = sc
+        if sc:
+            st.info(f"📊 {len(sc)}章 · {sum(len(st.session_state.chapters.get(c, '')) for c in sc):,}字")
+        b1, b2 = st.columns(2)
+        with b1:
+            da = st.button("🚀 提炼", key="da", use_container_width=True, type="primary", disabled=not (sc and st.session_state.api_key))
         with b2:
             if st.session_state.global_analysis:
-                if st.button("🔄 重做",key="rd",use_container_width=True): st.session_state.global_analysis=""; st.rerun()
-    else: st.info("💡 先导入"); da=False
+                if st.button("🔄 重做", key="rd", use_container_width=True):
+                    st.session_state.global_analysis = ""
+                    st.rerun()
+    else:
+        st.info("💡 先导入")
+        da = False
 
 with s2b:
     st.markdown("**结果**")
     if da:
-        t=get_combined_text(sc); ms=[{"role":"user","content":build_analysis_prompt(t)}]
+        t = get_combined_text(sc)
+        ms = [{"role": "user", "content": build_analysis_prompt(t)}]
         with st.spinner("🧠 分析中..."):
-            r=call_api_streaming(ms)
+            r = call_api_streaming(ms)
             if r:
-                co=st.empty(); f=stream_to_container(r,co)
+                co = st.empty()
+                f = stream_to_container(r, co)
                 if f:
-                    st.session_state.global_analysis=f
-                    st.session_state.messages=ms+[{"role":"assistant","content":f}]
-                    st.session_state.current_step=max(st.session_state.current_step,1)
+                    st.session_state.global_analysis = f
+                    st.session_state.messages = ms + [{"role": "assistant", "content": f}]
+                    st.session_state.current_step = max(st.session_state.current_step, 1)
                     st.success("✅ 完成！")
     elif st.session_state.global_analysis:
-        with st.expander("📋 查看",expanded=False): st.markdown(st.session_state.global_analysis)
-        st.markdown('<span class="tag tag-green">✅ 完成</span>',unsafe_allow_html=True)
+        with st.expander("📋 查看", expanded=False):
+            st.markdown(st.session_state.global_analysis)
+        st.markdown('<span class="tag tag-green">✅ 完成</span>', unsafe_allow_html=True)
     else:
-        st.markdown("""<div class="empty-state"><div class="empty-icon">🔍</div><div class="empty-text">等待</div></div>""",unsafe_allow_html=True)
+        st.markdown("""<div class="empty-state"><div class="empty-icon">🔍</div><div class="empty-text">等待</div></div>""", unsafe_allow_html=True)
 
 # ============================================================
 # 步骤三
@@ -982,16 +1030,26 @@ st.markdown("""<div class="card"><div class="card-header">
 <span class="card-icon">🎬</span><span class="card-title">步骤三：编剧控制台</span>
 <span class="card-subtitle">开场→生成→质检→优化</span></div></div>""", unsafe_allow_html=True)
 
-t1,t2,t3=st.columns([1,2,3])
-with t1: en=st.number_input("集",1,200,st.session_state.current_episode,key="ei"); st.session_state.current_episode=en
-with t2: ec=st.multiselect("章节",st.session_state.chapter_order,key="ec",help="本集参考")
-    # 上集衔接区域
+t1, t2, t3 = st.columns([1, 2, 3])
+with t1:
+    en = st.number_input("集", 1, 200, st.session_state.current_episode, key="ei")
+    st.session_state.current_episode = en
+with t2:
+    ec = st.multiselect("章节", st.session_state.chapter_order, key="ec", help="本集参考")
+with t3:
+    ad = bool(st.session_state.global_analysis)
+    st.markdown(f"""<div style="display:flex;gap:8px;padding-top:24px;flex-wrap:wrap;">
+<span class="tag tag-blue">第{en}集</span><span class="tag tag-purple">{get_active_model()}</span>
+{"<span class='tag tag-green'>✅提炼</span>" if ad else "<span class='tag tag-yellow'>⚠️未提炼</span>"}</div>""", unsafe_allow_html=True)
+
+# ============================================================
+# 上集衔接区域（新增功能）
+# ============================================================
 with st.expander("🔗 上集衔接（可选）", expanded=False):
-    # 自动检测是否有上集末尾信息
     auto_ending = st.session_state.memory.get("last_ending", "")
     if auto_ending:
         st.info(f"✅ 已自动提取第{st.session_state.memory.get('progress', '?')}集末尾分镜")
-    
+
     prev_ending = st.text_area(
         "上集末尾内容（最后1-3个分镜）",
         value=auto_ending,
@@ -1000,162 +1058,215 @@ with st.expander("🔗 上集衔接（可选）", expanded=False):
         help="粘贴上一集最后的分镜内容，AI会据此衔接。留空=第一集或新篇章开始",
         placeholder="留空表示不需要衔接（第一集或新篇章）\n\n或粘贴上一集最后的分镜内容，例如：\n【分镜11】（实算12.5s）\n场景：衣柜内外 · 傍晚...\n秦洛（咬牙切齿）：\"啧！你一个丧尸卖什么萌啊？\"\n..."
     )
-    
+
     if st.button("🗑️ 清空衔接", key="clear_prev", help="清空表示新篇章开始"):
         st.session_state.memory["last_ending"] = ""
         st.rerun()
-with t3:
-    ad=bool(st.session_state.global_analysis)
-    st.markdown(f"""<div style="display:flex;gap:8px;padding-top:24px;flex-wrap:wrap;">
-<span class="tag tag-blue">第{en}集</span><span class="tag tag-purple">{get_active_model()}</span>
-{"<span class='tag tag-green'>✅提炼</span>" if ad else "<span class='tag tag-yellow'>⚠️未提炼</span>"}</div>""",unsafe_allow_html=True)
 
-bc=st.columns(7)
-bd=[("🎯","设计开场"),("🎬","生成剧本"),("🔍","质量检查"),("💬","优化台词"),("🎨","优化画面"),("❤️","优化情绪"),("📦","批量生成")]
-bt={}
-for i,(ic,lb) in enumerate(bd):
-    with bc[i]: bt[lb]=st.button(f"{ic} {lb}",key=f"b_{lb}",use_container_width=True,type="primary" if lb=="生成剧本" else "secondary")
+# ============================================================
+# 功能按钮
+# ============================================================
+bc = st.columns(7)
+bd = [("🎯", "设计开场"), ("🎬", "生成剧本"), ("🔍", "质量检查"), ("💬", "优化台词"), ("🎨", "优化画面"), ("❤️", "优化情绪"), ("📦", "批量生成")]
+bt = {}
+for i, (ic, lb) in enumerate(bd):
+    with bc[i]:
+        bt[lb] = st.button(f"{ic} {lb}", key=f"b_{lb}", use_container_width=True, type="primary" if lb == "生成剧本" else "secondary")
 
 # ============================================================
 # 主Tabs
 # ============================================================
-mt=st.tabs(["📝 剧本","🔍 质检","🎯 开场","💬 对话","📊 总览"])
+mt = st.tabs(["📝 剧本", "🔍 质检", "🎯 开场", "💬 对话", "📊 总览"])
 
 with mt[0]:
     if bt["设计开场"]:
-        if not ad: st.warning("⚠️ 先提炼")
+        if not ad:
+            st.warning("⚠️ 先提炼")
         else:
-            ms=st.session_state.messages+[{"role":"user","content":build_opening_prompt()}]
-            with st.spinner("🎯..."): 
-                r=call_api_streaming(ms)
+            ms = st.session_state.messages + [{"role": "user", "content": build_opening_prompt()}]
+            with st.spinner("🎯..."):
+                r = call_api_streaming(ms)
                 if r:
-                    co=st.empty();f=stream_to_container(r,co)
-                    if f: st.session_state.opening_designs=f; st.session_state.messages=ms+[{"role":"assistant","content":f}]; st.session_state.current_step=max(st.session_state.current_step,2); st.success("✅")
+                    co = st.empty()
+                    f = stream_to_container(r, co)
+                    if f:
+                        st.session_state.opening_designs = f
+                        st.session_state.messages = ms + [{"role": "assistant", "content": f}]
+                        st.session_state.current_step = max(st.session_state.current_step, 2)
+                        st.success("✅")
 
     if bt["生成剧本"]:
-        if not ad: st.warning("⚠️ 先提炼")
+        if not ad:
+            st.warning("⚠️ 先提炼")
         else:
-            tx=get_combined_text(ec if ec else None); op=st.session_state.get("selected_opening","")
-pe=st.session_state.get("prev_ending","")  # 获取上集末尾内容
-pr=build_episode_prompt(en,tx,op,pe); cx=st.session_state.messages+[{"role":"user","content":pr}]
+            tx = get_combined_text(ec if ec else None)
+            op = st.session_state.get("selected_opening", "")
+            pe = st.session_state.get("prev_ending", "")
+            pr = build_episode_prompt(en, tx, op, pe)
+            cx = st.session_state.messages + [{"role": "user", "content": pr}]
             with st.spinner(f"🎬 第{en}集..."):
-                r=call_api_streaming(cx)
+                r = call_api_streaming(cx)
                 if r:
-                    co=st.empty();f=stream_to_container(r,co)
-                   if f:
-    st.session_state.episodes[en]=f
-    st.session_state.messages=cx+[{"role":"assistant","content":f}]
-    st.session_state.current_step=max(st.session_state.current_step,3)
-    st.session_state.memory["progress"]=str(en)
-    # 自动提取末尾分镜存入memory
-    last_scenes = extract_last_scenes(f, n=2)
-    if last_scenes:
-        st.session_state.memory["last_ending"] = last_scenes
-    st.success(f"✅ 第{en}集完成！")
-                    else: st.warning("⚠️ 空")
+                    co = st.empty()
+                    f = stream_to_container(r, co)
+                    if f:
+                        st.session_state.episodes[en] = f
+                        st.session_state.messages = cx + [{"role": "assistant", "content": f}]
+                        st.session_state.current_step = max(st.session_state.current_step, 3)
+                        st.session_state.memory["progress"] = str(en)
+                        last_scenes = extract_last_scenes(f, n=2)
+                        if last_scenes:
+                            st.session_state.memory["last_ending"] = last_scenes
+                        st.success(f"✅ 第{en}集完成！")
+                    else:
+                        st.warning("⚠️ 空")
 
     if bt["批量生成"]:
-        if not ad: st.warning("⚠️")
+        if not ad:
+            st.warning("⚠️")
         else:
-            b1,b2=st.columns(2)
-            with b1: bs=st.number_input("起始",1,200,en,key="bs")
-            with b2: be=st.number_input("结束",1,200,min(en+2,200),key="be")
-            if st.button("🚀 开始",key="bg",type="primary"):
-                tx=get_combined_text(ec if ec else None)
-                for e in range(int(bs),int(be)+1):
+            b1, b2 = st.columns(2)
+            with b1:
+                bs = st.number_input("起始", 1, 200, en, key="bs")
+            with b2:
+                be = st.number_input("结束", 1, 200, min(en + 2, 200), key="be")
+            if st.button("🚀 开始", key="bg", type="primary"):
+                tx = get_combined_text(ec if ec else None)
+                for e in range(int(bs), int(be) + 1):
                     st.markdown(f"---\n### 🎬 第{e}集")
-                    pe=st.session_state.memory.get("last_ending","")
-cx=st.session_state.messages+[{"role":"user","content":build_episode_prompt(e,tx,prev_ending=pe)}]
-                    r=call_api_streaming(cx)
+                    pe = st.session_state.memory.get("last_ending", "")
+                    cx = st.session_state.messages + [{"role": "user", "content": build_episode_prompt(e, tx, prev_ending=pe)}]
+                    r = call_api_streaming(cx)
                     if r:
-                        co=st.empty();f=stream_to_container(r,co)
+                        co = st.empty()
+                        f = stream_to_container(r, co)
                         if f:
-    st.session_state.episodes[e]=f
-    st.session_state.messages=cx+[{"role":"assistant","content":f}]
-    st.session_state.memory["progress"]=str(e)
-    last_scenes = extract_last_scenes(f, n=2)
-    if last_scenes:
-        st.session_state.memory["last_ending"] = last_scenes
-    st.success(f"✅ 第{e}集")
-                        else: st.warning(f"⚠️ 第{e}集空"); break
-                    else: st.error(f"❌ 第{e}集失败"); break
+                            st.session_state.episodes[e] = f
+                            st.session_state.messages = cx + [{"role": "assistant", "content": f}]
+                            st.session_state.memory["progress"] = str(e)
+                            last_scenes = extract_last_scenes(f, n=2)
+                            if last_scenes:
+                                st.session_state.memory["last_ending"] = last_scenes
+                            st.success(f"✅ 第{e}集")
+                        else:
+                            st.warning(f"⚠️ 第{e}集空")
+                            break
+                    else:
+                        st.error(f"❌ 第{e}集失败")
+                        break
 
     if bt["优化台词"]:
         if en in st.session_state.episodes:
-            pr=build_dialogue_optimization_prompt(en,st.session_state.episodes[en],st.session_state.global_analysis)
-            ms=st.session_state.messages+[{"role":"user","content":pr}]
+            pr = build_dialogue_optimization_prompt(en, st.session_state.episodes[en], st.session_state.global_analysis)
+            ms = st.session_state.messages + [{"role": "user", "content": pr}]
             with st.spinner("💬 角色DNA台词优化..."):
-                r=call_api_streaming(ms)
+                r = call_api_streaming(ms)
                 if r:
-                    co=st.empty();f=stream_to_container(r,co)
-                    if f: st.session_state.episodes[en]=f; st.session_state.messages=ms+[{"role":"assistant","content":f}]; st.success("✅ 台词优化完成（角色DNA驱动）")
-        else: st.warning(f"⚠️ 第{en}集未生成")
+                    co = st.empty()
+                    f = stream_to_container(r, co)
+                    if f:
+                        st.session_state.episodes[en] = f
+                        st.session_state.messages = ms + [{"role": "assistant", "content": f}]
+                        last_scenes = extract_last_scenes(f, n=2)
+                        if last_scenes:
+                            st.session_state.memory["last_ending"] = last_scenes
+                        st.success("✅ 台词优化完成（角色DNA驱动）")
+        else:
+            st.warning(f"⚠️ 第{en}集未生成")
 
     if bt["优化画面"]:
         if en in st.session_state.episodes:
-            pr=build_visual_optimization_prompt(en,st.session_state.episodes[en])
-            ms=st.session_state.messages+[{"role":"user","content":pr}]
+            pr = build_visual_optimization_prompt(en, st.session_state.episodes[en])
+            ms = st.session_state.messages + [{"role": "user", "content": pr}]
             with st.spinner("🎨..."):
-                r=call_api_streaming(ms)
+                r = call_api_streaming(ms)
                 if r:
-                    co=st.empty();f=stream_to_container(r,co)
-                    if f: st.session_state.episodes[en]=f; st.session_state.messages=ms+[{"role":"assistant","content":f}]; st.success("✅ 画面优化完成")
-        else: st.warning(f"⚠️ 第{en}集未生成")
+                    co = st.empty()
+                    f = stream_to_container(r, co)
+                    if f:
+                        st.session_state.episodes[en] = f
+                        st.session_state.messages = ms + [{"role": "assistant", "content": f}]
+                        last_scenes = extract_last_scenes(f, n=2)
+                        if last_scenes:
+                            st.session_state.memory["last_ending"] = last_scenes
+                        st.success("✅ 画面优化完成")
+        else:
+            st.warning(f"⚠️ 第{en}集未生成")
 
     if bt["优化情绪"]:
         if en in st.session_state.episodes:
-            pr=build_emotion_optimization_prompt(en,st.session_state.episodes[en])
-            ms=st.session_state.messages+[{"role":"user","content":pr}]
+            pr = build_emotion_optimization_prompt(en, st.session_state.episodes[en])
+            ms = st.session_state.messages + [{"role": "user", "content": pr}]
             with st.spinner("❤️..."):
-                r=call_api_streaming(ms)
+                r = call_api_streaming(ms)
                 if r:
-                    co=st.empty();f=stream_to_container(r,co)
-                    if f: st.session_state.episodes[en]=f; st.session_state.messages=ms+[{"role":"assistant","content":f}]; st.success("✅ 情绪优化完成")
-        else: st.warning(f"⚠️ 第{en}集未生成")
+                    co = st.empty()
+                    f = stream_to_container(r, co)
+                    if f:
+                        st.session_state.episodes[en] = f
+                        st.session_state.messages = ms + [{"role": "assistant", "content": f}]
+                        last_scenes = extract_last_scenes(f, n=2)
+                        if last_scenes:
+                            st.session_state.memory["last_ending"] = last_scenes
+                        st.success("✅ 情绪优化完成")
+        else:
+            st.warning(f"⚠️ 第{en}集未生成")
 
     st.markdown("---")
     if st.session_state.episodes:
         st.markdown("### 📜 已生成剧本")
-        se=sorted(st.session_state.episodes.keys())
-        et=st.tabs([f"第{e}集" for e in se])
-        for ix,e in enumerate(se):
+        se = sorted(st.session_state.episodes.keys())
+        et = st.tabs([f"第{e}集" for e in se])
+        for ix, e in enumerate(se):
             with et[ix]:
-                s=st.session_state.episodes[e]; sh=len(re.findall(r'【分镜\s*\d+】',s))
-                m1,m2,m3,m4=st.columns(4)
-                m1.metric("分镜",sh or "—"); m2.metric("时长",f"~{sh*12}s" if sh else "—")
-                m3.metric("字数",f"{len(s):,}"); m4.metric("质检","✅" if e in st.session_state.review_results else "⏳")
+                s = st.session_state.episodes[e]
+                sh = len(re.findall(r'【分镜\s*\d+】', s))
+                m1, m2, m3, m4 = st.columns(4)
+                m1.metric("分镜", sh or "—")
+                m2.metric("时长", f"~{sh * 12}s" if sh else "—")
+                m3.metric("字数", f"{len(s):,}")
+                m4.metric("质检", "✅" if e in st.session_state.review_results else "⏳")
                 st.markdown(s)
-                d1,d2=st.columns(2)
-                with d1: st.download_button(f"📥 导出",s,f"第{e}集.md","text/markdown",key=f"dl{e}")
+                d1, d2 = st.columns(2)
+                with d1:
+                    st.download_button(f"📥 导出", s, f"第{e}集.md", "text/markdown", key=f"dl{e}")
                 with d2:
-                    if st.button("📋 纯文本",key=f"cd{e}"): st.code(s,language="markdown")
+                    if st.button("📋 纯文本", key=f"cd{e}"):
+                        st.code(s, language="markdown")
     else:
-        st.markdown("""<div class="empty-state"><div class="empty-icon">🎬</div><div class="empty-text">尚未生成</div></div>""",unsafe_allow_html=True)
+        st.markdown("""<div class="empty-state"><div class="empty-icon">🎬</div><div class="empty-text">尚未生成</div></div>""", unsafe_allow_html=True)
 
 with mt[1]:
     if bt["质量检查"]:
-        if en not in st.session_state.episodes: st.warning(f"⚠️ 第{en}集未生成")
+        if en not in st.session_state.episodes:
+            st.warning(f"⚠️ 第{en}集未生成")
         else:
-            tx=get_combined_text(ec if ec else None); sc=st.session_state.episodes[en]
-            rm=[{"role":"user","content":build_review_prompt(en,sc,tx)}]
-            og=st.session_state.model_id
-            if st.session_state.review_model: st.session_state.model_id=st.session_state.review_model
+            tx = get_combined_text(ec if ec else None)
+            sc = st.session_state.episodes[en]
+            rm = [{"role": "user", "content": build_review_prompt(en, sc, tx)}]
+            og = st.session_state.model_id
+            if st.session_state.review_model:
+                st.session_state.model_id = st.session_state.review_model
             with st.spinner(f"🔍 质检第{en}集..."):
-                r=call_api_streaming(rm,REVIEW_SYSTEM_PROMPT)
+                r = call_api_streaming(rm, REVIEW_SYSTEM_PROMPT)
                 if r:
-                    co=st.empty();f=stream_to_container(r,co)
-                    if f: st.session_state.review_results[en]=f; st.session_state.current_step=max(st.session_state.current_step,4); st.success(f"✅ 第{en}集质检完成")
-            st.session_state.model_id=og
+                    co = st.empty()
+                    f = stream_to_container(r, co)
+                    if f:
+                        st.session_state.review_results[en] = f
+                        st.session_state.current_step = max(st.session_state.current_step, 4)
+                        st.success(f"✅ 第{en}集质检完成")
+            st.session_state.model_id = og
 
     if st.session_state.review_results:
         for e in sorted(st.session_state.review_results.keys()):
-            rv=st.session_state.review_results[e]
-            with st.expander(f"📊 第{e}集",expanded=(e==en)):
+            rv = st.session_state.review_results[e]
+            with st.expander(f"📊 第{e}集", expanded=(e == en)):
                 st.markdown(rv)
-                f1,f2,f3=st.columns(3)
+                f1, f2, f3 = st.columns(3)
                 with f1:
-                    if st.button(f"🔧 自动修改",key=f"fx{e}",type="primary"):
-                        fp=f"""根据质检修改第{e}集所有7分以下项。
+                    if st.button(f"🔧 自动修改", key=f"fx{e}", type="primary"):
+                        fp = f"""根据质检修改第{e}集所有7分以下项。
 
 【修改格式要求】
 1. 台词必须嵌入画面动作流（不能单独分行）
@@ -1164,68 +1275,89 @@ with mt[1]:
 4. 台词个性化（不能统一精简）
 
 质检：\n{rv}\n原剧本：\n{st.session_state.episodes[e]}\n输出修改后完整剧本。"""
-                        fm=st.session_state.messages+[{"role":"user","content":fp}]
+                        fm = st.session_state.messages + [{"role": "user", "content": fp}]
                         with st.spinner("🔧..."):
-                            r=call_api_streaming(fm)
+                            r = call_api_streaming(fm)
                             if r:
-                                co=st.empty();f=stream_to_container(r,co)
-                                if f: st.session_state.episodes[e]=f; st.success(f"✅ 已修改")
-                with f2: st.download_button("📥",rv,f"第{e}集_质检.md","text/markdown",key=f"dr{e}")
+                                co = st.empty()
+                                f = stream_to_container(r, co)
+                                if f:
+                                    st.session_state.episodes[e] = f
+                                    last_scenes = extract_last_scenes(f, n=2)
+                                    if last_scenes:
+                                        st.session_state.memory["last_ending"] = last_scenes
+                                    st.success(f"✅ 已修改")
+                with f2:
+                    st.download_button("📥", rv, f"第{e}集_质检.md", "text/markdown", key=f"dr{e}")
                 with f3:
-                    if st.button("🔄 重检",key=f"rr{e}"):
-                        if e in st.session_state.review_results: del st.session_state.review_results[e]
+                    if st.button("🔄 重检", key=f"rr{e}"):
+                        if e in st.session_state.review_results:
+                            del st.session_state.review_results[e]
                         st.rerun()
     else:
-        st.markdown("""<div class="empty-state"><div class="empty-icon">🔍</div><div class="empty-text">暂无质检</div></div>""",unsafe_allow_html=True)
+        st.markdown("""<div class="empty-state"><div class="empty-icon">🔍</div><div class="empty-text">暂无质检</div></div>""", unsafe_allow_html=True)
 
 with mt[2]:
     if st.session_state.opening_designs:
-        st.markdown("### 🎯 6套方案"); st.markdown(st.session_state.opening_designs); st.markdown("---")
-        o1,o2=st.columns([3,1])
-        with o1: ch=st.text_input("选择",placeholder="1-6或自定义",key="oc")
+        st.markdown("### 🎯 6套方案")
+        st.markdown(st.session_state.opening_designs)
+        st.markdown("---")
+        o1, o2 = st.columns([3, 1])
+        with o1:
+            ch = st.text_input("选择", placeholder="1-6或自定义", key="oc")
         with o2:
-            st.markdown("<br>",unsafe_allow_html=True)
-            if st.button("✅",key="cf",use_container_width=True,type="primary"):
-                if ch: st.session_state["selected_opening"]=ch; st.success(f"✅ {ch}")
+            st.markdown("<br>", unsafe_allow_html=True)
+            if st.button("✅", key="cf", use_container_width=True, type="primary"):
+                if ch:
+                    st.session_state["selected_opening"] = ch
+                    st.success(f"✅ {ch}")
     else:
-        st.markdown("""<div class="empty-state"><div class="empty-icon">🎯</div><div class="empty-text">待设计</div></div>""",unsafe_allow_html=True)
+        st.markdown("""<div class="empty-state"><div class="empty-icon">🎯</div><div class="empty-text">待设计</div></div>""", unsafe_allow_html=True)
 
 with mt[3]:
     st.markdown("### 💬 自由对话")
     for mg in st.session_state.chat_history[-20:]:
-        with st.chat_message(mg["role"]): st.markdown(mg["content"])
-    ui=st.chat_input("输入...",key="ci")
+        with st.chat_message(mg["role"]):
+            st.markdown(mg["content"])
+    ui = st.chat_input("输入...", key="ci")
     if ui:
-        st.session_state.chat_history.append({"role":"user","content":ui})
-        cx=""
-        if st.session_state.global_analysis: cx+=f"\n【提炼】{st.session_state.global_analysis[:3000]}"
+        st.session_state.chat_history.append({"role": "user", "content": ui})
+        cx = ""
+        if st.session_state.global_analysis:
+            cx += f"\n【提炼】{st.session_state.global_analysis[:3000]}"
         if st.session_state.episodes:
-            la=max(st.session_state.episodes.keys()); cx+=f"\n【第{la}集】{st.session_state.episodes[la][:2000]}"
-        fm=f"背景：{cx}\n\n指令：{ui}" if cx else ui
+            la = max(st.session_state.episodes.keys())
+            cx += f"\n【第{la}集】{st.session_state.episodes[la][:2000]}"
+        fm = f"背景：{cx}\n\n指令：{ui}" if cx else ui
         with st.chat_message("assistant"):
-            r=call_api_streaming([{"role":"user","content":fm}])
+            r = call_api_streaming([{"role": "user", "content": fm}])
             if r:
-                co=st.empty();f=stream_to_container(r,co)
-                if f: st.session_state.chat_history.append({"role":"assistant","content":f})
+                co = st.empty()
+                f = stream_to_container(r, co)
+                if f:
+                    st.session_state.chat_history.append({"role": "assistant", "content": f})
 
 with mt[4]:
     st.markdown("### 📊 总览")
-    o1,o2,o3,o4=st.columns(4)
-    o1.metric("📚",len(st.session_state.chapter_order)); o2.metric("🎬",len(st.session_state.episodes))
-    o3.metric("✅",len(st.session_state.review_results))
-    o4.metric("📝",f"{sum(len(v) for v in st.session_state.episodes.values()):,}" if st.session_state.episodes else "0")
+    o1, o2, o3, o4 = st.columns(4)
+    o1.metric("📚", len(st.session_state.chapter_order))
+    o2.metric("🎬", len(st.session_state.episodes))
+    o3.metric("✅", len(st.session_state.review_results))
+    o4.metric("📝", f"{sum(len(v) for v in st.session_state.episodes.values()):,}" if st.session_state.episodes else "0")
     st.markdown("---")
     if st.session_state.episodes:
         for e in sorted(st.session_state.episodes.keys()):
-            s=st.session_state.episodes[e]; sh=len(re.findall(r'【分镜\s*\d+】',s))
+            s = st.session_state.episodes[e]
+            sh = len(re.findall(r'【分镜\s*\d+】', s))
             st.markdown(f"""<div class="chapter-item"><div class="chapter-icon" style="background:linear-gradient(135deg,#3182ce,#2b6cb0);">{e}</div>
-<div class="chapter-info"><div class="chapter-name">第{e}集 <span class="tag tag-blue">{sh}镜</span> <span class="tag tag-green">~{sh*12}s</span></div>
-<div class="chapter-meta">{len(s):,}字 · {"✅" if e in st.session_state.review_results else "⏳"}</div></div></div>""",unsafe_allow_html=True)
-    st.markdown("---"); st.markdown("#### 📌 记忆（可编辑）")
-    for lb,ky in [("主线","storyline"),("人物","characters"),("进度","progress"),("结尾","last_ending"),("伏笔","pending_foreshadow"),("引爆","next_foreshadow"),("情绪","emotion_track")]:
-        nv=st.text_input(f"📌 {lb}",value=st.session_state.memory.get(ky,""),key=f"m_{ky}")
-        st.session_state.memory[ky]=nv
+<div class="chapter-info"><div class="chapter-name">第{e}集 <span class="tag tag-blue">{sh}镜</span> <span class="tag tag-green">~{sh * 12}s</span></div>
+<div class="chapter-meta">{len(s):,}字 · {"✅" if e in st.session_state.review_results else "⏳"}</div></div></div>""", unsafe_allow_html=True)
+    st.markdown("---")
+    st.markdown("#### 📌 记忆（可编辑）")
+    for lb, ky in [("主线", "storyline"), ("人物", "characters"), ("进度", "progress"), ("结尾", "last_ending"), ("伏笔", "pending_foreshadow"), ("引爆", "next_foreshadow"), ("情绪", "emotion_track")]:
+        nv = st.text_input(f"📌 {lb}", value=st.session_state.memory.get(ky, ""), key=f"m_{ky}")
+        st.session_state.memory[ky] = nv
 
 st.markdown("---")
 st.markdown(f"""<div style="text-align:center;padding:16px 0;"><span style="color:#a0aec0;font-size:0.75rem;">
-🎬 影视化视觉翻译引擎 V3.2 · 台词嵌入画面流 · 实算时长 · 角色DNA · {get_active_model()}</span></div>""",unsafe_allow_html=True)
+🎬 影视化视觉翻译引擎 V3.2 · 台词嵌入画面流 · 实算时长 · 角色DNA · {get_active_model()}</span></div>""", unsafe_allow_html=True)
