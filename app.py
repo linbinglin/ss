@@ -606,7 +606,7 @@ def build_opening_prompt():
 - 前30秒逐秒画面描述
 - 30秒后如何衔接主线"""
 
-def build_episode_prompt(ep, text, opening=""):
+def build_episode_prompt(ep, text, opening="", prev_ending=""):
     mem = st.session_state.memory
     mem_str = ""
     if mem.get("storyline"):
@@ -614,13 +614,32 @@ def build_episode_prompt(ep, text, opening=""):
 📌 主线：{mem['storyline']}
 📌 人物：{mem['characters']}
 📌 进度：第{mem['progress']}集
-📌 上集结尾：{mem['last_ending']}
 📌 伏笔：{mem['pending_foreshadow']}
 📌 引爆：{mem['next_foreshadow']}
 📌 情绪：{mem['emotion_track']}"""
 
+    # 上集衔接信息
+    prev_str = ""
+    if prev_ending and prev_ending.strip():
+        prev_str = f"""
+═══════════════════════════════════════
+🔗 上集末尾（必须衔接）
+═══════════════════════════════════════
+以下是上一集的结尾分镜，本集第一个分镜必须与之自然衔接：
+- 画面衔接：本集开场画面必须接上上集最后的"衔接点"
+- 情绪衔接：延续上集结尾的情绪氛围（可以延续也可以反转，但不能无视）
+- 时空衔接：注意角色的物理位置、状态、穿着与上集保持一致
+- 如果上集结尾有悬念钩子，本集需要在合适时机回应
+
+上集末尾内容：
+{prev_ending}
+"""
+    else:
+        prev_str = "\n（本集为第一集或新篇章开始，无需衔接上集）\n"
+
     return f"""请执行【第3轮：剧本生成】—— 第{ep}集
 {mem_str}
+{prev_str}
 {"选择的开场方案：" + opening if opening else ""}
 
 参考小说原文：
@@ -766,6 +785,15 @@ def build_emotion_optimization_prompt(ep, script):
 {script}
 
 输出优化后完整剧本，修改处标注【❤️】。"""
+
+def extract_last_scenes(script, n=2):
+    """从剧本中自动提取最后n个分镜"""
+    scenes = re.split(r'(?=【分镜\s*\d+】)', script)
+    scenes = [s.strip() for s in scenes if s.strip() and '【分镜' in s]
+    if not scenes:
+        return ""
+    last_scenes = scenes[-n:]
+    return "\n\n".join(last_scenes)
 
 # ============================================================
 # 侧边栏
@@ -957,6 +985,25 @@ st.markdown("""<div class="card"><div class="card-header">
 t1,t2,t3=st.columns([1,2,3])
 with t1: en=st.number_input("集",1,200,st.session_state.current_episode,key="ei"); st.session_state.current_episode=en
 with t2: ec=st.multiselect("章节",st.session_state.chapter_order,key="ec",help="本集参考")
+    # 上集衔接区域
+with st.expander("🔗 上集衔接（可选）", expanded=False):
+    # 自动检测是否有上集末尾信息
+    auto_ending = st.session_state.memory.get("last_ending", "")
+    if auto_ending:
+        st.info(f"✅ 已自动提取第{st.session_state.memory.get('progress', '?')}集末尾分镜")
+    
+    prev_ending = st.text_area(
+        "上集末尾内容（最后1-3个分镜）",
+        value=auto_ending,
+        height=150,
+        key="prev_ending",
+        help="粘贴上一集最后的分镜内容，AI会据此衔接。留空=第一集或新篇章开始",
+        placeholder="留空表示不需要衔接（第一集或新篇章）\n\n或粘贴上一集最后的分镜内容，例如：\n【分镜11】（实算12.5s）\n场景：衣柜内外 · 傍晚...\n秦洛（咬牙切齿）：\"啧！你一个丧尸卖什么萌啊？\"\n..."
+    )
+    
+    if st.button("🗑️ 清空衔接", key="clear_prev", help="清空表示新篇章开始"):
+        st.session_state.memory["last_ending"] = ""
+        st.rerun()
 with t3:
     ad=bool(st.session_state.global_analysis)
     st.markdown(f"""<div style="display:flex;gap:8px;padding-top:24px;flex-wrap:wrap;">
@@ -989,12 +1036,22 @@ with mt[0]:
         if not ad: st.warning("⚠️ 先提炼")
         else:
             tx=get_combined_text(ec if ec else None); op=st.session_state.get("selected_opening","")
-            pr=build_episode_prompt(en,tx,op); cx=st.session_state.messages+[{"role":"user","content":pr}]
+pe=st.session_state.get("prev_ending","")  # 获取上集末尾内容
+pr=build_episode_prompt(en,tx,op,pe); cx=st.session_state.messages+[{"role":"user","content":pr}]
             with st.spinner(f"🎬 第{en}集..."):
                 r=call_api_streaming(cx)
                 if r:
                     co=st.empty();f=stream_to_container(r,co)
-                    if f: st.session_state.episodes[en]=f; st.session_state.messages=cx+[{"role":"assistant","content":f}]; st.session_state.current_step=max(st.session_state.current_step,3); st.session_state.memory["progress"]=str(en); st.success(f"✅ 第{en}集完成！")
+                   if f:
+    st.session_state.episodes[en]=f
+    st.session_state.messages=cx+[{"role":"assistant","content":f}]
+    st.session_state.current_step=max(st.session_state.current_step,3)
+    st.session_state.memory["progress"]=str(en)
+    # 自动提取末尾分镜存入memory
+    last_scenes = extract_last_scenes(f, n=2)
+    if last_scenes:
+        st.session_state.memory["last_ending"] = last_scenes
+    st.success(f"✅ 第{en}集完成！")
                     else: st.warning("⚠️ 空")
 
     if bt["批量生成"]:
@@ -1007,11 +1064,19 @@ with mt[0]:
                 tx=get_combined_text(ec if ec else None)
                 for e in range(int(bs),int(be)+1):
                     st.markdown(f"---\n### 🎬 第{e}集")
-                    cx=st.session_state.messages+[{"role":"user","content":build_episode_prompt(e,tx)}]
+                    pe=st.session_state.memory.get("last_ending","")
+cx=st.session_state.messages+[{"role":"user","content":build_episode_prompt(e,tx,prev_ending=pe)}]
                     r=call_api_streaming(cx)
                     if r:
                         co=st.empty();f=stream_to_container(r,co)
-                        if f: st.session_state.episodes[e]=f; st.session_state.messages=cx+[{"role":"assistant","content":f}]; st.session_state.memory["progress"]=str(e); st.success(f"✅ 第{e}集")
+                        if f:
+    st.session_state.episodes[e]=f
+    st.session_state.messages=cx+[{"role":"assistant","content":f}]
+    st.session_state.memory["progress"]=str(e)
+    last_scenes = extract_last_scenes(f, n=2)
+    if last_scenes:
+        st.session_state.memory["last_ending"] = last_scenes
+    st.success(f"✅ 第{e}集")
                         else: st.warning(f"⚠️ 第{e}集空"); break
                     else: st.error(f"❌ 第{e}集失败"); break
 
