@@ -128,7 +128,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ============================================================
-# 系统提示词 (三大问题全面修正)
+# 系统提示词
 # ============================================================
 SYSTEM_PROMPT = """【微短剧生成 3.1 系统指令】
 
@@ -180,13 +180,13 @@ SYSTEM_PROMPT = """【微短剧生成 3.1 系统指令】
 → 关系决定说话方式：同一角色面对不同人说话不同
 
 【绝对禁止的台词方式】
-❌ 把所有角色台词统一缩短到2-4个字——会让所有角色都像"高冷人设"
-❌ 删掉角色口头禅、语气词——那是角色灵魂
-❌ 把话痨改成惜字如金——那是OOC
+❌ 把所有角色台词统一缩短到2-4个字
+❌ 删掉角色口头禅、语气词
+❌ 把话痨改成惜字如金
 ❌ 台词和画面分开写——必须嵌入画面流中
 
 ═══════════════════════════════════════
-★★★ 分镜格式铁律（最重要的格式规范）★★★
+★★★ 分镜格式铁律 ★★★
 ═══════════════════════════════════════
 
 【铁律A：台词必须嵌入画面动作流中】
@@ -194,16 +194,15 @@ SYSTEM_PROMPT = """【微短剧生成 3.1 系统指令】
 台词不是单独一行，台词必须出现在它被说出的那个精确时间位置上，
 和此刻正在发生的动作、表情、身体状态写在一起。
 
-❌ 绝对禁止的格式（台词与画面分离）：
+❌ 绝对禁止（台词与画面分离）：
 ```
 画面：[秦洛打响指，电流在指尖炸开，许多多被吓得后弹]
 秦洛："看，技能点。"
 许多多OS：（他有异能？！）
 音效：电流滋滋声
 ```
-问题：读者/导演不知道"看，技能点"这句话是在打响指前说的？还是后弹之后说的？
 
-✅ 正确格式（台词嵌入动作流的精确时间点）：
+✅ 正确格式（台词嵌入动作流）：
 ```
 秦洛带着战术手套的手指伸进毯子边缘——
 啪！响指。一簇幽蓝电流在指尖炸开（音效：尖锐滋滋声），
@@ -214,116 +213,34 @@ SYSTEM_PROMPT = """【微短剧生成 3.1 系统指令】
 许多多OS：（异能？！他……真的有异能？！）
 ```
 
-规则：
-1. 台词出现在它被说出的精确时间点——在哪个动作之后、哪个动作之前
-2. 台词前面必须紧跟说话时的【情绪状态+面部表情+身体动作】
-3. 内心OS出现在角色产生这个想法的精确时刻
-4. 音效出现在发出声音的那个动作旁边，用（）标注
-
 【铁律B：说台词时必须描写说话者的完整状态】
 
-每一句台词前面，必须包含以下三要素中的至少两个：
+每一句台词前面，必须包含至少两个：
+① 情绪/语气（低沉、暴怒、故作轻松、嘴硬但声音发颤……）
+② 面部表情（挑眉、眼神躲闪、下颌收紧、瞳孔放大……）
+③ 身体动作（双手插兜、指尖点桌面、侧过头不看对方……）
 
-① 情绪/语气标签：（低沉、暴怒、故作轻松、嘴硬但声音发颤、咬牙切齿……）
-② 面部表情：（挑眉、眼神躲闪、下颌收紧、瞳孔放大、嘴角抽搐……）
-③ 身体动作：（双手插兜、指尖点桌面、侧过头不看对方、攥紧拳头……）
+❌ 秦洛："抱紧点。"
 
-❌ 禁止的写法（裸台词）：
-秦洛："抱紧点。"
-
-✅ 正确的写法：
-秦洛低头看她，故意把表情板得很凶（但声音不自觉放软了）："抱紧点。掉下去被变异兽叼走，真就是一口一个小丧尸。"
-
-✅ 更好的写法：
-秦洛低头——本来想摆出教训小孩的凶脸，
+✅ 秦洛低头——本来想摆出教训小孩的凶脸，
 但看到她灰白大眼睛滴溜溜乱转的样子，
 喉结不自觉滚了一下，声音硬拽着往下压：
 "抱紧点。掉下去被变异兽叼走，真就是一口一个小丧尸。"
 他说完下意识把手臂往上紧了紧——
 这个动作和他嘴里的威胁完全矛盾。
 
-→ 观众同时看到：凶脸+放软的声音+收紧的手臂 = 嘴硬心软，全员心动。
+【铁律C：分镜时长必须实算】
 
-【铁律C：分镜时长必须实算，严禁虚标】
-
-每写完一个分镜，必须用以下换算尺实算：
-
-· 一个简单动作（转头/伸手/按按钮）= 0.5-1秒
-· 一个完整肢体动作（站起来/走几步/拿起东西喝一口）= 2-3秒
-· 一句台词：每3个字≈1.5秒（含说话节奏和气口）
-· 一个表情反应（震惊/微笑/皱眉）= 1-1.5秒
-· 一个环境展示镜头（摇镜/推镜）= 2-3秒
-· 一次复杂连续动作（打斗/奔跑+互动）= 3-5秒
-· 沉默/留白/情绪蓄力 = 1-2秒
-
-实算方法：把分镜里每一个动作/台词/反应逐个计时相加。
-标注时长与实算偏差必须≤±2秒。
-
-示范——正确的10秒分镜实算：
-
-秦洛手指伸进毯子边缘（1s）——
-啪！响指。幽蓝电流在指尖炸开（1.5s），电光照亮角落。
-秦洛（得意挑眉，嘴角歪向左边）：
-"看。哥的技能点。生存手册上没这玩意儿吧？"（3.5s）
-许多多瞳孔骤然收缩（0.5s）——身体本能后弹，
-后背撞在车厢壁上（1.5s）。
-许多多OS：（异能？！他真的有异能？！）（1.5s内心节奏）
-合计：1+1.5+3.5+0.5+1.5+1.5 = 10秒 ✅
-
-❌ 错误示范——标10秒但实际只有4秒：
-秦洛打响指（0.5s），电流炸开（1s），许多多后弹（1s），
-秦洛说"看，技能点"（1.5s）= 实际4秒，虚标了6秒。
-
-写完每个分镜后，必须在脑中快速实算，如果不够时长→补充动作/表情/环境细节/反应镜头。
-
-═══════════════════════════════════════
-灵魂锚定
-═══════════════════════════════════════
-你不是在"把小说改成剧本"。你是在替这些角色活一遍。
-如果你写出来的台词，换一个角色名字也能说得通，那这句台词就是废的，重写。
-如果你写出来的画面，闭上眼睛脑子里看不见具体的图像，那这段描写就是废的，重写。
-产品规格：每集分镜数量自由抉择 | 无第三人称旁白 | 集集强钩子。
-
-═══════════════════════════════════════
-五条创作铁律
-═══════════════════════════════════════
-①【人设即法律】角色的性格、说话方式、行为逻辑必须95%忠于原著。
-②【外化】一切"想、觉得、心痛、暗爽"必须转化为可拍摄的具体画面。允许第一人称内心OS，严禁第三人称旁白。
-③【伏笔】每一个重大转折之前，必须存在至少一个视觉/听觉微伏笔。
-④【潜台词】角色嘴上说的话与真实意图之间必须存在缝隙。台词传递表面意思，身体泄露真相。
-⑤【钩子铁律】前15秒必须制造具体的疑问或情绪冲击。每集结尾必须制造悬念。集内至少一次情绪急转。
-
-═══════════════════════════════════════
-角色驱动卡系统
-═══════════════════════════════════════
-为每个主要角色建立驱动卡，每次写台词/行为时必须调用：
-· 核心人格（一句话定义）
-· 说话DNA：句式习惯/口头禅/绝对不说的话/示范原句
-· 行为DNA：愤怒/心软/恐惧/说谎/得意时的物理反应
-· 红线（绝对不做的事）
-· 关系动态
-
-校验：每句台词→"遮住角色名能猜出是谁？"→不能→重写。
-
-═══════════════════════════════════════
-画面描写规律
-═══════════════════════════════════════
-→ 必须有一个"不寻常的具体细节"
-→ 用声音锚定空间（沉默场景更需要微小声音来放大沉默）
-→ 光源必须具体
-→ 身体失控比表情形容词有力一万倍
-→ 反差动作比直球动作有力
-
-═══════════════════════════════════════
-时长感知校准系统
-═══════════════════════════════════════
-· 一个简单动作 = 0.5-1秒
-· 一个完整肢体动作 = 2-3秒
-· 一句台词（每3字≈1.5秒）
-· 一个表情反应 = 1-1.5秒
-· 一个环境镜头 = 2-3秒
+换算尺：
+· 简单动作（转头/伸手）= 0.5-1秒
+· 完整动作（站起来/走几步）= 2-3秒
+· 台词：每3个字≈1.5秒
+· 表情反应 = 1-1.5秒
+· 环境镜头 = 2-3秒
 · 复杂连续动作 = 3-5秒
 · 沉默/留白 = 1-2秒
+
+写完每个分镜→逐项相加→标注实算总秒数→偏差≤±2秒。
 
 ═══════════════════════════════════════
 完整分镜格式示范
@@ -347,31 +264,59 @@ SYSTEM_PROMPT = """【微短剧生成 3.1 系统指令】
 
 衔接点：[许多多攥紧毯子的手指 → 车窗外突然暗下来的天色]
 
-格式要点：
-1. 台词嵌入在动作流的精确时间位置
-2. 台词前紧跟说话者的表情+情绪+身体状态
-3. 内心OS在角色产生想法的时刻出现
-4. 音效用（）标注在发声的动作旁边
-5. 每个动作/台词后标注预估秒数用于实算
-6. 分镜总时长 = 所有秒数相加
+═══════════════════════════════════════
+灵魂锚定
+═══════════════════════════════════════
+你不是在"把小说改成剧本"。你是在替这些角色活一遍。
+如果台词换个名字也能说通→废的，重写。
+如果画面闭眼看不见具体图像→废的，重写。
+产品规格：每集分镜数量自由抉择 | 无第三人称旁白 | 集集强钩子。
+
+═══════════════════════════════════════
+五条创作铁律
+═══════════════════════════════════════
+①【人设即法律】角色的性格、说话方式、行为逻辑必须95%忠于原著。
+②【外化】一切"想、觉得、心痛、暗爽"→可拍摄画面。允许第一人称内心OS，严禁第三人称旁白。
+③【伏笔】重大转折前必须有至少一个视觉/听觉微伏笔。
+④【潜台词】嘴上说的≠真实意图。台词传递表面意思，身体泄露真相。
+⑤【钩子铁律】前15秒制造疑问或情绪冲击。每集结尾制造悬念。集内至少一次情绪急转。
+
+═══════════════════════════════════════
+角色驱动卡系统
+═══════════════════════════════════════
+为每个主要角色建立驱动卡，每次写台词/行为时必须调用：
+· 核心人格 · 说话DNA（句式/口头禅/绝对不说的话/示范原句）
+· 行为DNA（愤怒/心软/恐惧/说谎/得意时的物理反应）
+· 红线 · 关系动态
+
+校验：每句台词→"遮住角色名能猜出是谁？"→不能→重写。
+
+═══════════════════════════════════════
+画面描写规律
+═══════════════════════════════════════
+→ 必须有一个"不寻常的具体细节"
+→ 声音锚定空间
+→ 光源具体
+→ 身体失控＞表情形容词
+→ 反差动作＞直球动作
 
 ═══════════════════════════════════════
 题材引擎
 ═══════════════════════════════════════
-【需要观众爽】→ 弹簧法
-【需要观众心动】→ 磁铁法
-【需要观众虐】→ 错位法
-【需要观众紧张】→ 橡皮筋法
-【需要观众笑】→ 错位法
+【需要观众爽】→ 弹簧法 【需要观众心动】→ 磁铁法
+【需要观众虐】→ 错位法 【需要观众紧张】→ 橡皮筋法
 
 ═══════════════════════════════════════
 工作流
 ═══════════════════════════════════════
 【第1轮：全局提炼】故事核心、角色驱动卡、大纲、核心节点、逻辑链、氛围基调、视觉强场景
-【第2轮：开场手法设计】6条不同方案，含前30秒逐秒画面
+【第2轮：开场手法设计】6条不同方案
 【第3轮：剧本生成】编剧内心独白+结构速写+角色调用+影视化排雷+完整分镜
-【第4轮：自检与优化】五个敌对视角+量化打分+细节清单"""
+【第4轮：自检与优化】12维度量化打分+五个敌对视角攻击+细节清单"""
 
+# ============================================================
+# 质检系统提示词 (补回五个敌对视角)
+# ============================================================
 REVIEW_SYSTEM_PROMPT = """你是一个专业的微短剧分镜质检专家。对照小说原文，对每一条分镜进行严格的质量检查。
 
 ═══════════════════════════════════════
@@ -418,10 +363,11 @@ REVIEW_SYSTEM_PROMPT = """你是一个专业的微短剧分镜质检专家。对
 - 结尾够不够让我点"下一集"？
 - 输出：作为路人观众，我会在第X秒划走，因为______
 
-【视角2：竞品编剧（想找你毛病的同行）】
+【视角2：编剧（想找你毛病的同行）】
+- 哪些分镜是"偷懒"的？（只台词没有具体画面）
 - 哪些情绪转折是"硬拗"的？（缺少铺垫就突然转变）
 - 整体节奏有没有拖沓或跳跃？
-- 输出：如果我是竞品，我会攻击你的______，并且用______方式做得更好
+- 输出：如果我是编剧，我会攻击你的______，并且用______方式做得更好
 
 【视角3：原著粉（对人设极度敏感的读者）】
 - 哪个角色被OOC了？具体哪句话/哪个行为违背原著？
@@ -445,30 +391,9 @@ REVIEW_SYSTEM_PROMPT = """你是一个专业的微短剧分镜质检专家。对
 - 整集的视觉风格统一吗？有没有某个分镜画风突变？
 - 输出：作为导演，我最想重拍的是分镜______，最满意的是分镜______
 
-═══════════════════════════════════════
-第三部分：细节自检清单
-═══════════════════════════════════════
-
-逐项打勾（✅/❌）：
-
-□ 每句台词前都有说话者的情绪+表情+身体描写（至少两个）
-□ 台词全部嵌入画面动作流的精确时间位置（无单独分行的台词）
-□ 每个分镜标注时长与实算时长偏差≤±2秒
-□ 遮住所有角色名，仅凭说话方式可辨别至少80%的台词归属
-□ 无第三人称旁白
-□ 开场15秒内有具体疑问或情绪冲击
-□ 结尾有悬念钩子（观众不看下集会难受）
-□ 集内至少一次情绪急转
-□ 每个分镜有≥1个不寻常的具体细节
-□ 每个分镜有≥1个具体声音
-□ 重大转折前有至少一个伏笔
-□ 无"死掉的台词"（换角色名也通的废台词）
-□ 无"死掉的画面"（闭眼看不见具体图像的抽象描写）
-□ 角色情绪变化有铺垫、不突兀
-□ ≥65%的情绪转折来自人物互动/环境碰撞（非独白驱动）
 
 ═══════════════════════════════════════
-第四部分：整集汇总报告
+第三部分：整集汇总报告
 ═══════════════════════════════════════
 
 1. **总分：** X/120（12维度平均分×12）
@@ -509,20 +434,15 @@ init_session_state()
 # ============================================================
 def get_active_model():
     model = st.session_state.model_id
-    if model == "自定义模型":
-        model = st.session_state.custom_model
+    if model == "自定义模型": model = st.session_state.custom_model
     return model if model else "deepseek-chat"
 
 def call_api_streaming(messages, system_prompt=SYSTEM_PROMPT):
     api_key = st.session_state.api_key
     api_base = st.session_state.api_base.rstrip("/")
     model = get_active_model()
-    if not api_key:
-        st.error("❌ 请先配置 API Key")
-        return None
-    if not api_base:
-        st.error("❌ 请先配置接口地址")
-        return None
+    if not api_key: st.error("❌ 请先配置 API Key"); return None
+    if not api_base: st.error("❌ 请先配置接口地址"); return None
     headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
     data = {
         "model": model,
@@ -531,24 +451,16 @@ def call_api_streaming(messages, system_prompt=SYSTEM_PROMPT):
     }
     try:
         resp = requests.post(f"{api_base}/chat/completions", headers=headers, json=data, stream=True, timeout=300)
-        resp.raise_for_status()
-        return resp
-    except requests.exceptions.Timeout:
-        st.error("❌ 超时（300秒）")
-        return None
-    except requests.exceptions.ConnectionError:
-        st.error("❌ 无法连接，检查接口地址")
-        return None
+        resp.raise_for_status(); return resp
+    except requests.exceptions.Timeout: st.error("❌ 超时"); return None
+    except requests.exceptions.ConnectionError: st.error("❌ 连接失败"); return None
     except requests.exceptions.HTTPError as e:
         code = e.response.status_code if e.response is not None else "?"
         body = ""
         try: body = e.response.text[:500] if e.response is not None else ""
         except: pass
-        st.error(f"❌ HTTP {code}: {body}")
-        return None
-    except Exception as e:
-        st.error(f"❌ {type(e).__name__}: {e}")
-        return None
+        st.error(f"❌ HTTP {code}: {body}"); return None
+    except Exception as e: st.error(f"❌ {type(e).__name__}: {e}"); return None
 
 def process_stream(response):
     if response is None: return
@@ -571,19 +483,15 @@ def process_stream(response):
             if not delta or not isinstance(delta, dict): continue
             content = delta.get("content")
             if content: yield content
-    except requests.exceptions.ChunkedEncodingError:
-        st.warning("⚠️ 传输中断，已保存内容")
-    except requests.exceptions.ConnectionError:
-        st.warning("⚠️ 连接中断")
-    except Exception as e:
-        st.warning(f"⚠️ {type(e).__name__}: {e}")
+    except requests.exceptions.ChunkedEncodingError: st.warning("⚠️ 传输中断")
+    except requests.exceptions.ConnectionError: st.warning("⚠️ 连接中断")
+    except Exception as e: st.warning(f"⚠️ {type(e).__name__}: {e}")
 
 def stream_to_container(response, container):
     if response is None: return ""
     full = ""
     for chunk in process_stream(response):
-        full += chunk
-        container.markdown(full)
+        full += chunk; container.markdown(full)
     return full
 
 def call_api_non_streaming(messages, system_prompt=SYSTEM_PROMPT):
@@ -599,14 +507,11 @@ def call_api_non_streaming(messages, system_prompt=SYSTEM_PROMPT):
     }
     try:
         resp = requests.post(f"{api_base}/chat/completions", headers=headers, json=data, timeout=120)
-        resp.raise_for_status()
-        result = resp.json()
+        resp.raise_for_status(); result = resp.json()
         choices = result.get("choices")
         if not choices or len(choices) == 0: return None
         return choices[0].get("message", {}).get("content", "")
-    except Exception as e:
-        st.error(f"❌ {type(e).__name__}: {e}")
-        return None
+    except Exception as e: st.error(f"❌ {type(e).__name__}: {e}"); return None
 
 # ============================================================
 # 章节管理
@@ -614,16 +519,14 @@ def call_api_non_streaming(messages, system_prompt=SYSTEM_PROMPT):
 def add_chapter(name, content):
     if name and content:
         st.session_state.chapters[name] = content
-        if name not in st.session_state.chapter_order:
-            st.session_state.chapter_order.append(name)
+        if name not in st.session_state.chapter_order: st.session_state.chapter_order.append(name)
         return True
     return False
 
 def remove_chapter(name):
     if name in st.session_state.chapters:
         del st.session_state.chapters[name]
-        if name in st.session_state.chapter_order:
-            st.session_state.chapter_order.remove(name)
+        if name in st.session_state.chapter_order: st.session_state.chapter_order.remove(name)
 
 def get_combined_text(names=None):
     if names is None: names = st.session_state.chapter_order
@@ -641,7 +544,7 @@ def build_analysis_prompt(text):
 
 请执行【第1轮：全局提炼】，输出：
 1. 一句话故事核心
-2. 每个主要角色的【驱动卡】（必须从原著提取原句作为说话DNA示范，特别注意每个角色的说话习惯差异）
+2. 每个主要角色的【驱动卡】（必须从原著提取原句作为说话DNA示范）
 3. 故事大纲（分阶段）+ 各阶段核心情绪类型
 4. 必须保留的核心情节节点（10-20个）
 5. 需要补充的逻辑链节点
@@ -678,81 +581,108 @@ def build_episode_prompt(ep, text, opening=""):
 
 严格执行前置ABCD，然后输出完整分镜剧本。
 
-【分镜格式强制要求——必须严格遵守】
-
-1. 台词必须嵌入画面动作流中，出现在它被说出的精确时间位置
-   不允许把台词单独放在画面描写下面！
-
-2. 每句台词前面必须紧跟说话者的：
-   - 情绪/语气（低沉/暴怒/故作轻松/嘴硬但声音发颤……）
-   - 面部表情（挑眉/眼神躲闪/下颌收紧/嘴角抽搐……）
-   - 身体动作（双手插兜/侧过头/攥拳……）
-   至少写两个。
-
-3. 每个分镜必须实算时长：
-   - 简单动作=0.5-1s，完整动作=2-3s
-   - 台词每3字≈1.5s，表情反应=1-1.5s
-   - 逐个相加，标注总时长
-   - 每个分镜目标10-14秒
-
+【分镜格式强制要求】
+1. 台词必须嵌入画面动作流，出现在被说出的精确时间位置
+2. 每句台词前紧跟说话者的情绪/表情/身体状态（至少两个）
+3. 每个分镜实算时长（逐项相加，目标10-14秒）
 4. 内心OS出现在角色产生想法的那个时刻
-5. 音效用（）标注在发声动作旁边
+5. 音效用（）标注在发声动作旁
 
 示范格式：
 【分镜XX】（实算Xs）
 场景：地点 · 时间 · 天气 · 光线
 
-[角色动作描写]（Xs）——
-[继续动作/变化]（Xs）（音效：xxx）。
-角色A（情绪描写+表情+身体状态）："台词内容"（Xs）
-[另一角色的反应动作]（Xs）。
-角色B OS：（内心独白内容）（Xs）
+[角色动作]（Xs）——
+[变化/发展]（Xs）（音效：xxx）。
+角色A（情绪+表情+身体）："台词"（Xs）
+[另一角色反应]（Xs）。
+角色B OS：（内心独白）（Xs）
 
 衔接点：[最后画面 → 下一镜]"""
 
 def build_review_prompt(ep, script, text):
-    return f"""请对第{ep}集剧本逐条分镜进行详细质检。
+    return f"""请对第{ep}集剧本执行完整的【第4轮：自检与优化】。
 
-【小说原文】
+═══════════════════════════════════════
+【对照的小说原文】
 {text}
 
-【剧本分镜】
+【需要质检的剧本】
 {script}
+═══════════════════════════════════════
 
-逐镜检查12个维度（1-10分），特别注意三个重点项：
+请严格按照以下四个部分逐一执行，不得遗漏任何部分：
 
-【重点1：时长实算】
-对每个分镜逐秒拆解（列出每个动作/台词的秒数，求和），
-检查标注时长与实算时长偏差是否≤±2秒。
+【第一部分：12维度逐镜检查】
+对每一条分镜检查12个维度（每项1-10分），输出表格。
+特别注意三个重点项：
+- 时长实算（逐秒拆解）
+- 台词嵌入度（是否嵌入画面流）
+- 台词情绪描写（是否有表情/情绪/身体状态）
 
-【重点2：台词嵌入度】
-每句台词是否嵌入在画面动作流的精确位置？
-还是单独另起一行与画面分离？
+【第二部分：五个敌对视角攻击】
+质检完所有分镜后，切换为以下五个视角逐一攻击整集：
 
-【重点3：台词情绪描写】
-每句台词前面是否描写了说话者当时的情绪+表情+身体状态？
-还是"裸台词"（只有角色名+台词内容）？
+视角1——普通观众（刷短视频的路人）：
+前3秒抓不抓人？哪里无聊会划走？不看原著能看懂吗？结尾想不想点下一集？
+→ 输出："我会在第X秒划走，因为______"
 
-输出检查报告+汇总。7分以下必须给修改方案。"""
+视角2——竞品编剧（找毛病的同行）：
+哪些分镜偷懒？哪些情绪硬拗？哪些台词死掉了？节奏拖沓或跳跃？
+→ 输出："我会攻击你的______，并用______做得更好"
+
+视角3——原著粉（人设敏感的读者）：
+哪个角色OOC？核心情节被改了吗？角色化学反应够吗？情感核心保留了吗？
+→ 输出："最不能接受______，因为原著中______"
+
+视角4——剪辑师（后期技术人员）：
+时长虚标？缺衔接点？动作不够精确？画面信息过载？台词时间关系清楚吗？
+→ 输出："剪不动的地方是______，因为______"
+
+视角5——导演（整体质量负责人）：
+记忆点是什么？情绪曲线形状？演员能直接演吗？视觉风格统一吗？
+→ 输出："最想重拍分镜______，最满意分镜______"
+
+【第三部分：细节自检清单】
+逐项打勾（✅/❌）：
+□ 每句台词前有情绪+表情+身体描写
+□ 台词全部嵌入画面流
+□ 时长偏差≤±2秒
+□ 遮名可辨≥80%台词归属
+□ 无第三人称旁白
+□ 开场15秒有冲击
+□ 结尾有悬念
+□ 集内至少一次情绪急转
+□ 每镜有不寻常细节
+□ 每镜有具体声音
+□ 转折前有伏笔
+□ 无死台词、无死画面
+□ 情绪变化有铺垫
+□ ≥65%转折来自互动
+
+【第四部分：整集汇总】
+1. 总分
+2. 7分以下项目列表（按优先级排序）
+3. 五个视角核心攻击点汇总
+4. 全局性问题
+5. 优秀之处
+6. 修改优先级排序"""
 
 def build_dialogue_optimization_prompt(ep, script, global_analysis=""):
-    character_info = ""
-    if global_analysis:
-        character_info = f"\n【角色驱动卡参考】\n{global_analysis[:4000]}\n"
+    char_info = ""
+    if global_analysis: char_info = f"\n【角色驱动卡参考】\n{global_analysis[:4000]}\n"
     return f"""台词优化第{ep}集。
+{char_info}
+【核心：优化≠精简！而是个性化+潜台词化+情绪匹配+嵌入画面流】
 
-{character_info}
+步骤：
+1. 确认每个角色说话DNA
+2. 逐句检查：个性标签、情绪匹配、潜台词、关系动态
+3. 补充台词前的情绪/表情/身体描写
+4. 确保台词嵌入画面流的正确时间位置
 
-【核心：台词优化≠精简！而是个性化+潜台词化+情绪匹配】
-
-优化步骤：
-1. 确认每个角色的说话DNA
-2. 逐句检查：个性标签、情绪匹配、潜台词深度、关系动态
-3. 补充台词前的情绪/表情/身体描写（如果缺失）
-4. 确保台词嵌入在画面动作流的正确时间位置
-
-❌ 禁止：统一缩短/删口头禅/让话痨变沉默/台词与画面分离
-✅ 要求：每处修改标注原因+关联角色DNA
+❌ 禁止：统一缩短/删口头禅/话痨变沉默/台词与画面分离
+✅ 每处修改标注原因+关联角色DNA
 
 当前剧本：
 {script}
@@ -761,127 +691,97 @@ def build_dialogue_optimization_prompt(ep, script, global_analysis=""):
 
 def build_visual_optimization_prompt(ep, script):
     return f"""画面优化第{ep}集。
-
-要求：
-1. 不寻常具体细节（声音/光影/微动作）
-2. 声音锚定空间
-3. 光源具体化
-4. 身体失控＞表情形容词
-5. 反差动作＞直球动作
-6. 每分镜≥5个动作事件（有时间流动感）
-7. 台词保持嵌入式格式不变
-8. 实算时长不变
-
+要求：不寻常细节、声音锚定、光源具体、身体失控＞表情词、反差动作、≥5动作事件、台词保持嵌入格式、时长不变。
 当前剧本：
 {script}
-
-输出优化后完整剧本，修改处标注【🎨】。"""
+输出优化版，标注【🎨】。"""
 
 def build_emotion_optimization_prompt(ep, script):
     return f"""情绪优化第{ep}集。
-
-要求：
-1. 开场15秒足够冲击
-2. 集内至少一次情绪急转
-3. 结尾悬念钩子
-4. 情绪曲线有起伏
-5. 题材引擎（弹簧法/磁铁法/错位法/橡皮筋法）
-6. ≥65%转折来自互动
-7. 台词格式和嵌入方式不变
-
+要求：开场冲击、集内急转、结尾悬念、起伏曲线、题材引擎手法、≥65%转折来自互动、台词格式不变。
 当前剧本：
 {script}
-
-输出优化后完整剧本，修改处标注【❤️】。"""
+输出优化版，标注【❤️】。"""
 
 # ============================================================
 # 侧边栏
 # ============================================================
 with st.sidebar:
-    st.markdown('<div class="sidebar-group-title">🔌 API 配置</div>', unsafe_allow_html=True)
-    api_base = st.text_input("接口地址", value=st.session_state.api_base, key="sb_ab", placeholder="https://yunwu.ai/v1/")
-    st.session_state.api_base = api_base
-    api_key = st.text_input("API Key", value=st.session_state.api_key, type="password", key="sb_ak", placeholder="sk-...")
-    st.session_state.api_key = api_key
+    st.markdown('<div class="sidebar-group-title">🔌 API</div>', unsafe_allow_html=True)
+    ab = st.text_input("接口", value=st.session_state.api_base, key="sab", placeholder="https://yunwu.ai/v1/")
+    st.session_state.api_base = ab
+    ak = st.text_input("Key", value=st.session_state.api_key, type="password", key="sak", placeholder="sk-...")
+    st.session_state.api_key = ak
 
     st.markdown("---")
     st.markdown('<div class="sidebar-group-title">🤖 模型</div>', unsafe_allow_html=True)
-    model_options = [
-        "deepseek-chat", "deepseek-reasoner",
-        "claude-sonnet-4-20250514", "claude-opus-4-20250514",
-        "gpt-4o", "gpt-4o-mini", "gpt-4-turbo", "o3-mini",
-        "gemini-2.5-pro-preview-06-05", "自定义模型"
-    ]
-    cm1, cm2 = st.columns([3,1])
+    mopts = ["deepseek-chat","deepseek-reasoner","claude-sonnet-4-20250514","claude-opus-4-20250514",
+             "gpt-4o","gpt-4o-mini","gpt-4-turbo","o3-mini","gemini-2.5-pro-preview-06-05","自定义模型"]
+    cm1,cm2 = st.columns([3,1])
     with cm1:
-        sel = st.selectbox("生成模型", model_options,
-            index=model_options.index(st.session_state.model_id) if st.session_state.model_id in model_options else 0, key="sb_m")
-        st.session_state.model_id = sel
+        sm = st.selectbox("生成", mopts,
+            index=mopts.index(st.session_state.model_id) if st.session_state.model_id in mopts else 0, key="sm")
+        st.session_state.model_id = sm
     with cm2:
         st.markdown("<br>", unsafe_allow_html=True)
-        if st.button("🔗", key="sb_t", use_container_width=True, help="测试"):
+        if st.button("🔗",key="st",use_container_width=True,help="测试"):
             with st.spinner("..."):
-                r = call_api_non_streaming([{"role":"user","content":"回复OK"}], "你是助手。")
+                r=call_api_non_streaming([{"role":"user","content":"回复OK"}],"你是助手。")
                 st.success("✅") if r else st.error("❌")
-    if sel == "自定义模型":
-        cm = st.text_input("模型ID", value=st.session_state.custom_model, key="sb_c", placeholder="deepseek-v3")
-        st.session_state.custom_model = cm
-    rev_opts = ["与生成模型相同"] + model_options
-    rv = st.selectbox("质检模型", rev_opts, key="sb_rv")
-    st.session_state.review_model = None if rv == "与生成模型相同" else rv
-
-    st.markdown("---")
-    st.markdown('<div class="sidebar-group-title">🎯 模式</div>', unsafe_allow_html=True)
-    md = st.radio("", ["📋 默认", "⚡ 快速"], key="sb_md", label_visibility="collapsed")
-    st.session_state.mode = "默认" if "默认" in md else "快速"
+    if sm=="自定义模型":
+        cv=st.text_input("ID",value=st.session_state.custom_model,key="sc",placeholder="模型ID")
+        st.session_state.custom_model=cv
+    ro=["与生成模型相同"]+mopts
+    rv=st.selectbox("质检模型",ro,key="srv")
+    st.session_state.review_model=None if rv=="与生成模型相同" else rv
 
     st.markdown("---")
     st.markdown('<div class="sidebar-group-title">💾 数据</div>', unsafe_allow_html=True)
-    if st.button("📌 全局记忆", use_container_width=True, key="sb_me"):
-        st.session_state["show_memory_modal"] = True
+    if st.button("📌 记忆",use_container_width=True,key="sme"):
+        st.session_state["show_memory_modal"]=True
     if st.session_state.episodes:
-        st.download_button("📦 导出全部", use_container_width=True, key="sb_ex",
+        st.download_button("📦 导出",use_container_width=True,key="sex",
             data=json.dumps({"analysis":st.session_state.global_analysis,
                 "episodes":{str(k):v for k,v in st.session_state.episodes.items()},
                 "reviews":{str(k):v for k,v in st.session_state.review_results.items()},
-                "memory":st.session_state.memory}, ensure_ascii=False, indent=2),
-            file_name=f"剧本_{datetime.now().strftime('%m%d_%H%M')}.json", mime="application/json")
-    if st.button("🗑️ 重置", use_container_width=True, key="sb_rs"):
+                "memory":st.session_state.memory},ensure_ascii=False,indent=2),
+            file_name=f"剧本_{datetime.now().strftime('%m%d_%H%M')}.json",mime="application/json")
+    if st.button("🗑️ 重置",use_container_width=True,key="srs"):
         for k in list(st.session_state.keys()): del st.session_state[k]
         init_session_state(); st.rerun()
 
 # ============================================================
 # 顶部
 # ============================================================
-step_names = ["导入章节","全局提炼","开场设计","生成剧本","质检优化"]
-current = st.session_state.current_step
+step_names=["导入","提炼","开场","生成","质检"]
+cur=st.session_state.current_step
 st.markdown(f"""<div class="header-bar"><div class="header-left">
 <div class="header-title">🎬 影视化视觉翻译引擎 V3.2</div>
-<div class="header-sub">视觉翻译法则 · 角色DNA台词 · 台词嵌入画面流 · 实算时长</div></div>
+<div class="header-sub">视觉翻译 · 角色DNA台词 · 嵌入式分镜 · 实算时长 · 五视角质检</div></div>
 <div style="display:flex;gap:8px;flex-wrap:wrap;">
-<span class="header-badge">📚 {len(st.session_state.chapter_order)}章</span>
-<span class="header-badge">🎬 {len(st.session_state.episodes)}集</span>
-<span class="header-badge">🤖 {get_active_model()}</span></div></div>""", unsafe_allow_html=True)
+<span class="header-badge">📚{len(st.session_state.chapter_order)}章</span>
+<span class="header-badge">🎬{len(st.session_state.episodes)}集</span>
+<span class="header-badge">🤖{get_active_model()}</span></div></div>""",unsafe_allow_html=True)
 
-sh = ""
+sh=""
 for i,n in enumerate(step_names):
-    c = "done" if i<current else ("active" if i==current else "")
-    ic = "✓" if i<current else str(i+1)
-    sh += f'<div class="step-item {c}"><span class="step-num">{ic}</span>{n}</div>'
-st.markdown(f'<div class="step-indicator">{sh}</div>', unsafe_allow_html=True)
+    c="done" if i<cur else ("active" if i==cur else "")
+    ic="✓" if i<cur else str(i+1)
+    sh+=f'<div class="step-item {c}"><span class="step-num">{ic}</span>{n}</div>'
+st.markdown(f'<div class="step-indicator">{sh}</div>',unsafe_allow_html=True)
 
 if st.session_state.get("show_memory_modal"):
-    mem = st.session_state.memory
-    with st.expander("📌 全局记忆", expanded=True):
+    mem=st.session_state.memory
+    with st.expander("📌 全局记忆",expanded=True):
         st.markdown(f"""<div class="memory-panel">
-<div class="memory-item"><span class="memory-key">📌 主线：</span><span class="memory-val">{mem.get('storyline') or '—'}</span></div>
-<div class="memory-item"><span class="memory-key">👥 人物：</span><span class="memory-val">{mem.get('characters') or '—'}</span></div>
-<div class="memory-item"><span class="memory-key">📍 进度：</span><span class="memory-val">{mem.get('progress') or '—'}</span></div>
-<div class="memory-item"><span class="memory-key">🔚 结尾：</span><span class="memory-val">{mem.get('last_ending') or '—'}</span></div>
-<div class="memory-item"><span class="memory-key">🔮 伏笔：</span><span class="memory-val">{mem.get('pending_foreshadow') or '—'}</span></div>
-<div class="memory-item"><span class="memory-key">💥 引爆：</span><span class="memory-val">{mem.get('next_foreshadow') or '—'}</span></div>
-<div class="memory-item"><span class="memory-key">❤️ 情绪：</span><span class="memory-val">{mem.get('emotion_track') or '—'}</span></div>
-</div>""", unsafe_allow_html=True)
+<div class="memory-item"><span class="memory-key">📌主线：</span><span class="memory-val">{mem.get('storyline') or '—'}</span></div>
+<div class="memory-item"><span class="memory-key">👥人物：</span><span class="memory-val">{mem.get('characters') or '—'}</span></div>
+<div class="memory-item"><span class="memory-key">📍进度：</span><span class="memory-val">{mem.get('progress') or '—'}</span></div>
+<div class="memory-item"><span class="memory-key">🔚结尾：</span><span class="memory-val">{mem.get('last_ending') or '—'}</span></div>
+<div class="memory-item"><span class="memory-key">🔮伏笔：</span><span class="memory-val">{mem.get('pending_foreshadow') or '—'}</span></div>
+<div class="memory-item"><span class="memory-key">💥引爆：</span><span class="memory-val">{mem.get('next_foreshadow') or '—'}</span></div>
+<div class="memory-item"><span class="memory-key">❤️情绪：</span><span class="memory-val">{mem.get('emotion_track') or '—'}</span></div>
+</div>""",unsafe_allow_html=True)
         if st.button("关闭",key="cmm"): st.session_state["show_memory_modal"]=False; st.rerun()
 
 # ============================================================
@@ -889,28 +789,27 @@ if st.session_state.get("show_memory_modal"):
 # ============================================================
 st.markdown("""<div class="card"><div class="card-header">
 <span class="card-icon">📖</span><span class="card-title">步骤一：导入小说章节</span>
-<span class="card-subtitle">.txt/.md 上传 或 粘贴</span></div></div>""", unsafe_allow_html=True)
+<span class="card-subtitle">.txt/.md 上传或粘贴</span></div></div>""",unsafe_allow_html=True)
 
-ca, cl = st.columns([1,1])
+ca,cl=st.columns([1,1])
 with ca:
-    at = st.tabs(["📁 上传","✍️ 粘贴"])
+    at=st.tabs(["📁 上传","✍️ 粘贴"])
     with at[0]:
-        up = st.file_uploader("选择",type=["txt","md","text"],accept_multiple_files=True,key="up")
+        up=st.file_uploader("选择",type=["txt","md","text"],accept_multiple_files=True,key="up")
         if up:
             for u in up:
-                if u.size>200*1024: st.warning(f"⚠️ {u.name}>200KB"); continue
+                if u.size>200*1024: st.warning(f"⚠️{u.name}>200KB"); continue
                 try: ct=u.read().decode("utf-8",errors="ignore")
                 except: ct=""
                 cn=u.name.rsplit(".",1)[0] if "." in u.name else u.name
                 if cn not in st.session_state.chapters and ct:
-                    add_chapter(cn,ct); st.success(f"✅ {cn} ({len(ct)}字)")
+                    add_chapter(cn,ct); st.success(f"✅{cn}({len(ct)}字)")
     with at[1]:
         pn=st.text_input("名称",placeholder="第1章",key="pn")
         pc=st.text_area("内容",height=180,placeholder="粘贴...",key="pc")
-        if st.button("➕ 添加",key="pa",use_container_width=True,type="primary"):
-            if pn and pc: add_chapter(pn,pc); st.success(f"✅ {pn}"); st.rerun()
+        if st.button("➕添加",key="pa",use_container_width=True,type="primary"):
+            if pn and pc: add_chapter(pn,pc); st.success(f"✅{pn}"); st.rerun()
             else: st.warning("请填写")
-
 with cl:
     st.markdown("**已导入**")
     if st.session_state.chapter_order:
@@ -919,58 +818,54 @@ with cl:
 <div class="stat-item"><div class="stat-value">{len(st.session_state.chapter_order)}</div><div class="stat-label">章节</div></div>
 <div class="stat-item"><div class="stat-value">{tc:,}</div><div class="stat-label">总字</div></div>
 <div class="stat-item"><div class="stat-value">{tc//max(len(st.session_state.chapter_order),1):,}</div><div class="stat-label">均字</div></div>
-</div>""", unsafe_allow_html=True)
+</div>""",unsafe_allow_html=True)
         for i,ch in enumerate(st.session_state.chapter_order):
             ct=st.session_state.chapters.get(ch,"")
             c1,c2,c3=st.columns([5,1,1])
             with c1: st.markdown(f"""<div class="chapter-item"><div class="chapter-icon">{i+1}</div>
-<div class="chapter-info"><div class="chapter-name">{ch}</div><div class="chapter-meta">{len(ct):,}字</div></div></div>""", unsafe_allow_html=True)
+<div class="chapter-info"><div class="chapter-name">{ch}</div><div class="chapter-meta">{len(ct):,}字</div></div></div>""",unsafe_allow_html=True)
             with c2:
-                if st.button("👁️",key=f"v{i}",help="看"):
-                    st.session_state[f"e{i}"]=not st.session_state.get(f"e{i}",False)
+                if st.button("👁️",key=f"v{i}",help="看"): st.session_state[f"e{i}"]=not st.session_state.get(f"e{i}",False)
             with c3:
                 if st.button("🗑️",key=f"d{i}",help="删"): remove_chapter(ch); st.rerun()
             if st.session_state.get(f"e{i}"):
-                with st.expander(f"📖 {ch}",expanded=True): st.text_area("",ct,height=200,disabled=True,key=f"p{i}")
+                with st.expander(f"📖{ch}",expanded=True): st.text_area("",ct,height=200,disabled=True,key=f"p{i}")
     else:
-        st.markdown("""<div class="empty-state"><div class="empty-icon">📚</div><div class="empty-text">暂无</div></div>""", unsafe_allow_html=True)
+        st.markdown("""<div class="empty-state"><div class="empty-icon">📚</div><div class="empty-text">暂无</div></div>""",unsafe_allow_html=True)
 
 # ============================================================
 # 步骤二
 # ============================================================
 st.markdown("""<div class="card"><div class="card-header">
 <span class="card-icon">🔍</span><span class="card-title">步骤二：全局提炼</span>
-<span class="card-subtitle">角色驱动卡 · 情节 · 视觉</span></div></div>""", unsafe_allow_html=True)
+<span class="card-subtitle">驱动卡·情节·视觉</span></div></div>""",unsafe_allow_html=True)
 
 s2a,s2b=st.columns([1,1])
 with s2a:
     if st.session_state.chapter_order:
-        sc=st.multiselect("选择章节",st.session_state.chapter_order,default=st.session_state.chapter_order,key="sc",label_visibility="collapsed")
+        sc=st.multiselect("章节",st.session_state.chapter_order,default=st.session_state.chapter_order,key="sc",label_visibility="collapsed")
         st.session_state.selected_chapters_for_analysis=sc
-        if sc: st.info(f"📊 {len(sc)}章 · {sum(len(st.session_state.chapters.get(c,'')) for c in sc):,}字")
+        if sc: st.info(f"📊{len(sc)}章·{sum(len(st.session_state.chapters.get(c,'')) for c in sc):,}字")
         b1,b2=st.columns(2)
-        with b1: da=st.button("🚀 提炼",key="da",use_container_width=True,type="primary",disabled=not(sc and st.session_state.api_key))
+        with b1: da=st.button("🚀提炼",key="da",use_container_width=True,type="primary",disabled=not(sc and st.session_state.api_key))
         with b2:
             if st.session_state.global_analysis:
-                if st.button("🔄 重做",key="rd",use_container_width=True): st.session_state.global_analysis=""; st.rerun()
-    else: st.info("💡 先导入"); da=False
-
+                if st.button("🔄重做",key="rd",use_container_width=True): st.session_state.global_analysis=""; st.rerun()
+    else: st.info("💡先导入"); da=False
 with s2b:
     st.markdown("**结果**")
     if da:
         t=get_combined_text(sc); ms=[{"role":"user","content":build_analysis_prompt(t)}]
-        with st.spinner("🧠 分析中..."):
+        with st.spinner("🧠分析..."):
             r=call_api_streaming(ms)
             if r:
                 co=st.empty(); f=stream_to_container(r,co)
                 if f:
-                    st.session_state.global_analysis=f
-                    st.session_state.messages=ms+[{"role":"assistant","content":f}]
-                    st.session_state.current_step=max(st.session_state.current_step,1)
-                    st.success("✅ 完成！")
+                    st.session_state.global_analysis=f; st.session_state.messages=ms+[{"role":"assistant","content":f}]
+                    st.session_state.current_step=max(st.session_state.current_step,1); st.success("✅")
     elif st.session_state.global_analysis:
-        with st.expander("📋 查看",expanded=False): st.markdown(st.session_state.global_analysis)
-        st.markdown('<span class="tag tag-green">✅ 完成</span>',unsafe_allow_html=True)
+        with st.expander("📋查看",expanded=False): st.markdown(st.session_state.global_analysis)
+        st.markdown('<span class="tag tag-green">✅完成</span>',unsafe_allow_html=True)
     else:
         st.markdown("""<div class="empty-state"><div class="empty-icon">🔍</div><div class="empty-text">等待</div></div>""",unsafe_allow_html=True)
 
@@ -979,7 +874,7 @@ with s2b:
 # ============================================================
 st.markdown("""<div class="card"><div class="card-header">
 <span class="card-icon">🎬</span><span class="card-title">步骤三：编剧控制台</span>
-<span class="card-subtitle">开场→生成→质检→优化</span></div></div>""", unsafe_allow_html=True)
+<span class="card-subtitle">开场→生成→质检→优化</span></div></div>""",unsafe_allow_html=True)
 
 t1,t2,t3=st.columns([1,2,3])
 with t1: en=st.number_input("集",1,200,st.session_state.current_episode,key="ei"); st.session_state.current_episode=en
@@ -988,70 +883,67 @@ with t3:
     ad=bool(st.session_state.global_analysis)
     st.markdown(f"""<div style="display:flex;gap:8px;padding-top:24px;flex-wrap:wrap;">
 <span class="tag tag-blue">第{en}集</span><span class="tag tag-purple">{get_active_model()}</span>
-{"<span class='tag tag-green'>✅提炼</span>" if ad else "<span class='tag tag-yellow'>⚠️未提炼</span>"}</div>""",unsafe_allow_html=True)
+{"<span class='tag tag-green'>✅</span>" if ad else "<span class='tag tag-yellow'>⚠️</span>"}</div>""",unsafe_allow_html=True)
 
 bc=st.columns(7)
 bd=[("🎯","设计开场"),("🎬","生成剧本"),("🔍","质量检查"),("💬","优化台词"),("🎨","优化画面"),("❤️","优化情绪"),("📦","批量生成")]
 bt={}
 for i,(ic,lb) in enumerate(bd):
-    with bc[i]: bt[lb]=st.button(f"{ic} {lb}",key=f"b_{lb}",use_container_width=True,type="primary" if lb=="生成剧本" else "secondary")
+    with bc[i]: bt[lb]=st.button(f"{ic}{lb}",key=f"b_{lb}",use_container_width=True,type="primary" if lb=="生成剧本" else "secondary")
 
-# ============================================================
-# 主Tabs
-# ============================================================
-mt=st.tabs(["📝 剧本","🔍 质检","🎯 开场","💬 对话","📊 总览"])
+mt=st.tabs(["📝剧本","🔍质检","🎯开场","💬对话","📊总览"])
 
 with mt[0]:
     if bt["设计开场"]:
-        if not ad: st.warning("⚠️ 先提炼")
+        if not ad: st.warning("⚠️先提炼")
         else:
             ms=st.session_state.messages+[{"role":"user","content":build_opening_prompt()}]
-            with st.spinner("🎯..."): 
+            with st.spinner("🎯..."):
                 r=call_api_streaming(ms)
                 if r:
                     co=st.empty();f=stream_to_container(r,co)
                     if f: st.session_state.opening_designs=f; st.session_state.messages=ms+[{"role":"assistant","content":f}]; st.session_state.current_step=max(st.session_state.current_step,2); st.success("✅")
 
     if bt["生成剧本"]:
-        if not ad: st.warning("⚠️ 先提炼")
+        if not ad: st.warning("⚠️先提炼")
         else:
             tx=get_combined_text(ec if ec else None); op=st.session_state.get("selected_opening","")
             pr=build_episode_prompt(en,tx,op); cx=st.session_state.messages+[{"role":"user","content":pr}]
-            with st.spinner(f"🎬 第{en}集..."):
+            with st.spinner(f"🎬第{en}集..."):
                 r=call_api_streaming(cx)
                 if r:
                     co=st.empty();f=stream_to_container(r,co)
-                    if f: st.session_state.episodes[en]=f; st.session_state.messages=cx+[{"role":"assistant","content":f}]; st.session_state.current_step=max(st.session_state.current_step,3); st.session_state.memory["progress"]=str(en); st.success(f"✅ 第{en}集完成！")
-                    else: st.warning("⚠️ 空")
+                    if f: st.session_state.episodes[en]=f; st.session_state.messages=cx+[{"role":"assistant","content":f}]; st.session_state.current_step=max(st.session_state.current_step,3); st.session_state.memory["progress"]=str(en); st.success(f"✅第{en}集完成！")
+                    else: st.warning("⚠️空")
 
     if bt["批量生成"]:
         if not ad: st.warning("⚠️")
         else:
             b1,b2=st.columns(2)
-            with b1: bs=st.number_input("起始",1,200,en,key="bs")
-            with b2: be=st.number_input("结束",1,200,min(en+2,200),key="be")
-            if st.button("🚀 开始",key="bg",type="primary"):
+            with b1: bs=st.number_input("起",1,200,en,key="bs")
+            with b2: be=st.number_input("止",1,200,min(en+2,200),key="be")
+            if st.button("🚀开始",key="bg",type="primary"):
                 tx=get_combined_text(ec if ec else None)
                 for e in range(int(bs),int(be)+1):
-                    st.markdown(f"---\n### 🎬 第{e}集")
+                    st.markdown(f"---\n### 🎬第{e}集")
                     cx=st.session_state.messages+[{"role":"user","content":build_episode_prompt(e,tx)}]
                     r=call_api_streaming(cx)
                     if r:
                         co=st.empty();f=stream_to_container(r,co)
-                        if f: st.session_state.episodes[e]=f; st.session_state.messages=cx+[{"role":"assistant","content":f}]; st.session_state.memory["progress"]=str(e); st.success(f"✅ 第{e}集")
-                        else: st.warning(f"⚠️ 第{e}集空"); break
-                    else: st.error(f"❌ 第{e}集失败"); break
+                        if f: st.session_state.episodes[e]=f; st.session_state.messages=cx+[{"role":"assistant","content":f}]; st.session_state.memory["progress"]=str(e); st.success(f"✅第{e}集")
+                        else: st.warning(f"⚠️第{e}集空"); break
+                    else: st.error(f"❌第{e}集失败"); break
 
     if bt["优化台词"]:
         if en in st.session_state.episodes:
             pr=build_dialogue_optimization_prompt(en,st.session_state.episodes[en],st.session_state.global_analysis)
             ms=st.session_state.messages+[{"role":"user","content":pr}]
-            with st.spinner("💬 角色DNA台词优化..."):
+            with st.spinner("💬角色DNA优化..."):
                 r=call_api_streaming(ms)
                 if r:
                     co=st.empty();f=stream_to_container(r,co)
-                    if f: st.session_state.episodes[en]=f; st.session_state.messages=ms+[{"role":"assistant","content":f}]; st.success("✅ 台词优化完成（角色DNA驱动）")
-        else: st.warning(f"⚠️ 第{en}集未生成")
+                    if f: st.session_state.episodes[en]=f; st.session_state.messages=ms+[{"role":"assistant","content":f}]; st.success("✅台词优化完成")
+        else: st.warning(f"⚠️第{en}集未生成")
 
     if bt["优化画面"]:
         if en in st.session_state.episodes:
@@ -1061,8 +953,8 @@ with mt[0]:
                 r=call_api_streaming(ms)
                 if r:
                     co=st.empty();f=stream_to_container(r,co)
-                    if f: st.session_state.episodes[en]=f; st.session_state.messages=ms+[{"role":"assistant","content":f}]; st.success("✅ 画面优化完成")
-        else: st.warning(f"⚠️ 第{en}集未生成")
+                    if f: st.session_state.episodes[en]=f; st.session_state.messages=ms+[{"role":"assistant","content":f}]; st.success("✅画面优化完成")
+        else: st.warning(f"⚠️第{en}集未生成")
 
     if bt["优化情绪"]:
         if en in st.session_state.episodes:
@@ -1072,12 +964,12 @@ with mt[0]:
                 r=call_api_streaming(ms)
                 if r:
                     co=st.empty();f=stream_to_container(r,co)
-                    if f: st.session_state.episodes[en]=f; st.session_state.messages=ms+[{"role":"assistant","content":f}]; st.success("✅ 情绪优化完成")
-        else: st.warning(f"⚠️ 第{en}集未生成")
+                    if f: st.session_state.episodes[en]=f; st.session_state.messages=ms+[{"role":"assistant","content":f}]; st.success("✅情绪优化完成")
+        else: st.warning(f"⚠️第{en}集未生成")
 
     st.markdown("---")
     if st.session_state.episodes:
-        st.markdown("### 📜 已生成剧本")
+        st.markdown("### 📜已生成剧本")
         se=sorted(st.session_state.episodes.keys())
         et=st.tabs([f"第{e}集" for e in se])
         for ix,e in enumerate(se):
@@ -1088,9 +980,9 @@ with mt[0]:
                 m3.metric("字数",f"{len(s):,}"); m4.metric("质检","✅" if e in st.session_state.review_results else "⏳")
                 st.markdown(s)
                 d1,d2=st.columns(2)
-                with d1: st.download_button(f"📥 导出",s,f"第{e}集.md","text/markdown",key=f"dl{e}")
+                with d1: st.download_button(f"📥导出",s,f"第{e}集.md","text/markdown",key=f"dl{e}")
                 with d2:
-                    if st.button("📋 纯文本",key=f"cd{e}"): st.code(s,language="markdown")
+                    if st.button("📋纯文本",key=f"cd{e}"): st.code(s,language="markdown")
     else:
         st.markdown("""<div class="empty-state"><div class="empty-icon">🎬</div><div class="empty-text">尚未生成</div></div>""",unsafe_allow_html=True)
 
@@ -1126,35 +1018,43 @@ with mt[1]:
 4. 台词个性化（不能统一精简）
 5. 针对五个敌对视角的攻击点逐一回应和修改
 
-质检：\n{rv}\n原剧本：\n{st.session_state.episodes[e]}\n输出修改后完整剧本。"""
+质检报告：
+{rv}
+
+原剧本：
+{st.session_state.episodes[e]}
+
+输出修改后完整剧本，修改处标注【✏️】并说明针对哪个问题。"""
                         fm=st.session_state.messages+[{"role":"user","content":fp}]
                         with st.spinner("🔧..."):
                             r=call_api_streaming(fm)
                             if r:
                                 co=st.empty();f=stream_to_container(r,co)
-                                if f: st.session_state.episodes[e]=f; st.success(f"✅ 已修改")
-                with f2: st.download_button("📥",rv,f"第{e}集_质检.md","text/markdown",key=f"dr{e}")
+                                if f: st.session_state.episodes[e]=f; st.success(f"✅已修改")
+                with f2: st.download_button("📥报告",rv,f"第{e}集_质检.md","text/markdown",key=f"dr{e}")
                 with f3:
-                    if st.button("🔄 重检",key=f"rr{e}"):
+                    if st.button("🔄重检",key=f"rr{e}"):
                         if e in st.session_state.review_results: del st.session_state.review_results[e]
                         st.rerun()
     else:
-        st.markdown("""<div class="empty-state"><div class="empty-icon">🔍</div><div class="empty-text">暂无质检</div></div>""",unsafe_allow_html=True)
+        st.markdown("""<div class="empty-state"><div class="empty-icon">🔍</div>
+<div class="empty-text">暂无质检</div>
+<div class="empty-hint">12维度逐镜检查 + 五个敌对视角攻击 + 细节清单 + 汇总报告</div></div>""",unsafe_allow_html=True)
 
 with mt[2]:
     if st.session_state.opening_designs:
-        st.markdown("### 🎯 6套方案"); st.markdown(st.session_state.opening_designs); st.markdown("---")
+        st.markdown("### 🎯6套方案"); st.markdown(st.session_state.opening_designs); st.markdown("---")
         o1,o2=st.columns([3,1])
         with o1: ch=st.text_input("选择",placeholder="1-6或自定义",key="oc")
         with o2:
             st.markdown("<br>",unsafe_allow_html=True)
             if st.button("✅",key="cf",use_container_width=True,type="primary"):
-                if ch: st.session_state["selected_opening"]=ch; st.success(f"✅ {ch}")
+                if ch: st.session_state["selected_opening"]=ch; st.success(f"✅{ch}")
     else:
         st.markdown("""<div class="empty-state"><div class="empty-icon">🎯</div><div class="empty-text">待设计</div></div>""",unsafe_allow_html=True)
 
 with mt[3]:
-    st.markdown("### 💬 自由对话")
+    st.markdown("### 💬自由对话")
     for mg in st.session_state.chat_history[-20:]:
         with st.chat_message(mg["role"]): st.markdown(mg["content"])
     ui=st.chat_input("输入...",key="ci")
@@ -1172,7 +1072,7 @@ with mt[3]:
                 if f: st.session_state.chat_history.append({"role":"assistant","content":f})
 
 with mt[4]:
-    st.markdown("### 📊 总览")
+    st.markdown("### 📊总览")
     o1,o2,o3,o4=st.columns(4)
     o1.metric("📚",len(st.session_state.chapter_order)); o2.metric("🎬",len(st.session_state.episodes))
     o3.metric("✅",len(st.session_state.review_results))
@@ -1183,12 +1083,12 @@ with mt[4]:
             s=st.session_state.episodes[e]; sh=len(re.findall(r'【分镜\s*\d+】',s))
             st.markdown(f"""<div class="chapter-item"><div class="chapter-icon" style="background:linear-gradient(135deg,#3182ce,#2b6cb0);">{e}</div>
 <div class="chapter-info"><div class="chapter-name">第{e}集 <span class="tag tag-blue">{sh}镜</span> <span class="tag tag-green">~{sh*12}s</span></div>
-<div class="chapter-meta">{len(s):,}字 · {"✅" if e in st.session_state.review_results else "⏳"}</div></div></div>""",unsafe_allow_html=True)
-    st.markdown("---"); st.markdown("#### 📌 记忆（可编辑）")
+<div class="chapter-meta">{len(s):,}字·{"✅" if e in st.session_state.review_results else "⏳"}</div></div></div>""",unsafe_allow_html=True)
+    st.markdown("---"); st.markdown("#### 📌记忆（可编辑）")
     for lb,ky in [("主线","storyline"),("人物","characters"),("进度","progress"),("结尾","last_ending"),("伏笔","pending_foreshadow"),("引爆","next_foreshadow"),("情绪","emotion_track")]:
-        nv=st.text_input(f"📌 {lb}",value=st.session_state.memory.get(ky,""),key=f"m_{ky}")
+        nv=st.text_input(f"📌{lb}",value=st.session_state.memory.get(ky,""),key=f"m_{ky}")
         st.session_state.memory[ky]=nv
 
 st.markdown("---")
 st.markdown(f"""<div style="text-align:center;padding:16px 0;"><span style="color:#a0aec0;font-size:0.75rem;">
-🎬 影视化视觉翻译引擎 V3.2 · 台词嵌入画面流 · 实算时长 · 角色DNA · {get_active_model()}</span></div>""",unsafe_allow_html=True)
+🎬 V3.2 · 12维度+5视角质检 · 嵌入式台词 · 实算时长 · {get_active_model()}</span></div>""",unsafe_allow_html=True)
