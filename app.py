@@ -1021,13 +1021,21 @@ st.markdown("""<div class="card"><div class="card-header">
 <span class="card-subtitle">开场→生成→质检→优化</span></div></div>""", unsafe_allow_html=True)
 
 t1,t2,t3=st.columns([1,2,3])
-with t1: en=st.number_input("集",1,200,st.session_state.current_episode,key="ei"); st.session_state.current_episode=en
-with t2: ec=st.multiselect("章节",st.session_state.chapter_order,key="ec",help="本集参考")
+with t1:
+    en=st.number_input("集",1,200,st.session_state.current_episode,key="ei")
+    st.session_state.current_episode=en
+with t2:
+    ec=st.multiselect("章节",st.session_state.chapter_order,key="ec",help="本集参考")
 with t3:
     ad=bool(st.session_state.global_analysis)
-    st.markdown(f"""<div style="display:flex;gap:8px;padding-top:24px;flex-wrap:wrap;">
-<span class="tag tag-blue">第{en}集</span><span class="tag tag-purple">{get_active_model()}</span>
-{"<span class='tag tag-green'>✅</span>" if ad else "<span class='tag tag-yellow'>⚠️</span>"}</div>""",unsafe_allow_html=True)
+    tag_status = "<span class='tag tag-green'>✅</span>" if ad else "<span class='tag tag-yellow'>⚠️</span>"
+    st.markdown(
+        f'<div style="display:flex;gap:8px;padding-top:24px;flex-wrap:wrap;">'
+        f'<span class="tag tag-blue">第{en}集</span>'
+        f'<span class="tag tag-purple">{get_active_model()}</span>'
+        f'{tag_status}</div>',
+        unsafe_allow_html=True
+    )
 
 # ─── 上集衔接区 ───
 auto_last_shot = ""
@@ -1040,7 +1048,6 @@ with st.expander(f"🔗 上集衔接（第{prev_ep}集 → 第{en}集）", expan
         st.caption(f"✅ 已自动提取第{prev_ep}集最后一个分镜，你可以编辑或清空")
     else:
         st.caption("💡 留空 = 第一集或新篇章开始，不需要衔接上集")
-    
     last_shot_input = st.text_area(
         "上集末尾分镜内容",
         value=auto_last_shot,
