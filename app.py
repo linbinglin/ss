@@ -1158,7 +1158,7 @@ cx=st.session_state.messages+[{"role":"user","content":build_episode_prompt(e, t
                 with d2:
                     if st.button("📋 纯文本",key=f"cd{e}"): st.code(s,language="markdown")
     else:
-        st.markdown("""<div class="empty-state"><div class="empty-icon">🎬</div><div class="empty-text">尚未生成</div></div>""",unsafe_allow_html=True)
+        st.markdown("""<div class="empty-state"><div class="empty-icon">&#128230;</div><div class="empty-text">尚未生成</div></div>""",unsafe_allow_html=True)
 
 with mt[1]:
     if bt["质量检查"]:
