@@ -1056,8 +1056,6 @@ with st.expander(f"🔗 上集衔接（第{prev_ep}集 → 第{en}集）", expan
         placeholder="粘贴上一集最后一个分镜的内容...\n留空则视为新篇章开头，不做衔接。",
         help="系统会自动提取已生成的上一集末尾分镜。你也可以手动粘贴外部剧本的末尾内容。"
     )
-<span class="tag tag-blue">第{en}集</span><span class="tag tag-purple">{get_active_model()}</span>
-{"<span class='tag tag-green'>✅提炼</span>" if ad else "<span class='tag tag-yellow'>⚠️未提炼</span>"}</div>""",unsafe_allow_html=True)
 
 bc=st.columns(7)
 bd=[("🎯","设计开场"),("🎬","生成剧本"),("🔍","质量检查"),("💬","优化台词"),("🎨","优化画面"),("❤️","优化情绪"),("📦","批量生成")]
