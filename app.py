@@ -870,10 +870,21 @@ with st.sidebar:
                 "memory": st.session_state.memory}, ensure_ascii=False, indent=2),
             file_name=f"剧本_{datetime.now().strftime('%m%d_%H%M')}.json", mime="application/json")
     if st.button("🗑️ 重置", use_container_width=True, key="sb_rs"):
-        for k in list(st.session_state.keys()):
-            del st.session_state[k]
-        init_session_state()
-        st.rerun()
+        if st.session_state.get("confirm_reset"):
+            data_keys = ["chapters", "chapter_order", "current_step", "current_episode",
+                         "global_analysis", "opening_designs", "episodes", "review_results",
+                         "memory", "messages", "chat_history", "mode",
+                         "selected_chapters_for_analysis", "prev_ending"]
+            for k in data_keys:
+                if k in st.session_state:
+                    del st.session_state[k]
+            st.session_state["confirm_reset"] = False
+            init_session_state()
+            st.rerun()
+        else:
+            st.session_state["confirm_reset"] = True
+            st.warning("⚠️ 再次点击确认重置")
+            st.rerun()
 
 # ============================================================
 # 顶部
@@ -1231,7 +1242,7 @@ with mt[0]:
                 with d1:
                     st.download_button(f"📥 导出", s, f"第{e}集.md", "text/markdown", key=f"dl{e}")
                 with d2:
-                    if st.button("📋 纯文本", key=f"cd{e}"):
+                    with st.popover("📋 纯文本"):
                         st.code(s, language="markdown")
     else:
         st.markdown("""<div class="empty-state"><div class="empty-icon">🎬</div><div class="empty-text">尚未生成</div></div>""", unsafe_allow_html=True)
