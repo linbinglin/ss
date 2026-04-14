@@ -2,6 +2,7 @@ import streamlit as st
 import json
 import time
 import re
+import os
 import requests
 from typing import List, Dict, Optional
 from datetime import datetime
@@ -15,6 +16,88 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded"
 )
+
+# ============================================================
+# 本地自动保存/恢复系统（防数据丢失）
+# ============================================================
+AUTOSAVE_FILE = "autosave_data.json"
+
+def auto_save():
+    """将关键数据自动保存到本地文件"""
+    try:
+        data = {
+            "chapters": st.session_state.get("chapters", {}),
+            "chapter_order": st.session_state.get("chapter_order", []),
+            "current_step": st.session_state.get("current_step", 0),
+            "current_episode": st.session_state.get("current_episode", 1),
+            "global_analysis": st.session_state.get("global_analysis", ""),
+            "opening_designs": st.session_state.get("opening_designs", ""),
+            "episodes": {str(k): v for k, v in st.session_state.get("episodes", {}).items()},
+            "review_results": {str(k): v for k, v in st.session_state.get("review_results", {}).items()},
+            "memory": st.session_state.get("memory", {}),
+            "messages": st.session_state.get("messages", []),
+            "chat_history": st.session_state.get("chat_history", []),
+            "save_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        }
+        with open(AUTOSAVE_FILE, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+    except Exception:
+        pass
+
+def auto_restore():
+    """从本地文件恢复数据（仅当session_state中数据为空时）"""
+    if not os.path.exists(AUTOSAVE_FILE):
+        return False
+    # 如果已经有章节或剧本数据，不需要恢复
+    if st.session_state.get("chapters") and len(st.session_state["chapters"]) > 0:
+        return False
+    if st.session_state.get("episodes") and len(st.session_state["episodes"]) > 0:
+        return False
+    try:
+        with open(AUTOSAVE_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        # 检查备份是否有实际数据
+        has_data = (
+            len(data.get("chapters", {})) > 0 or
+            len(data.get("episodes", {})) > 0 or
+            data.get("global_analysis", "") != ""
+        )
+        if not has_data:
+            return False
+        # 恢复数据
+        if data.get("chapters"):
+            st.session_state["chapters"] = data["chapters"]
+        if data.get("chapter_order"):
+            st.session_state["chapter_order"] = data["chapter_order"]
+        if data.get("current_step"):
+            st.session_state["current_step"] = data["current_step"]
+        if data.get("current_episode"):
+            st.session_state["current_episode"] = data["current_episode"]
+        if data.get("global_analysis"):
+            st.session_state["global_analysis"] = data["global_analysis"]
+        if data.get("opening_designs"):
+            st.session_state["opening_designs"] = data["opening_designs"]
+        if data.get("episodes"):
+            st.session_state["episodes"] = {int(k): v for k, v in data["episodes"].items()}
+        if data.get("review_results"):
+            st.session_state["review_results"] = {int(k): v for k, v in data["review_results"].items()}
+        if data.get("memory"):
+            st.session_state["memory"] = data["memory"]
+        if data.get("messages"):
+            st.session_state["messages"] = data["messages"]
+        if data.get("chat_history"):
+            st.session_state["chat_history"] = data["chat_history"]
+        return True
+    except Exception:
+        return False
+
+def clear_autosave():
+    """清除本地备份文件"""
+    try:
+        if os.path.exists(AUTOSAVE_FILE):
+            os.remove(AUTOSAVE_FILE)
+    except Exception:
+        pass
 
 # ============================================================
 # CSS样式
@@ -117,6 +200,11 @@ st.markdown("""
     }
     .stTabs [data-baseweb="tab"] { border-radius: 8px; padding: 8px 20px; font-size: 0.82rem; }
     .stTabs [aria-selected="true"] { background: white !important; box-shadow: 0 1px 3px rgba(0,0,0,0.08); }
+    .restore-banner {
+        background: linear-gradient(135deg, #f0fff4, #c6f6d5);
+        border: 1px solid #68d391; border-radius: 10px; padding: 12px 16px;
+        margin-bottom: 16px; display: flex; align-items: center; gap: 10px;
+    }
     @media (max-width: 768px) {
         .header-bar { flex-direction: column; text-align: center; }
         .stats-bar { flex-direction: column; }
@@ -128,7 +216,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 # ============================================================
-# 系统提示词 (三大问题全面修正)
+# 系统提示词
 # ============================================================
 SYSTEM_PROMPT = """【微短剧生成 3.1 系统指令】
 
@@ -454,6 +542,13 @@ def init_session_state():
 
 init_session_state()
 
+# 启动时尝试恢复数据
+if not st.session_state.get("_restore_attempted"):
+    st.session_state["_restore_attempted"] = True
+    restored = auto_restore()
+    if restored:
+        st.session_state["_just_restored"] = True
+
 # ============================================================
 # API调用
 # ============================================================
@@ -479,28 +574,42 @@ def call_api_streaming(messages, system_prompt=SYSTEM_PROMPT):
         "messages": [{"role": "system", "content": system_prompt}] + messages,
         "stream": True, "temperature": 0.7, "max_tokens": 16384
     }
-    try:
-        resp = requests.post(f"{api_base}/chat/completions", headers=headers, json=data, stream=True, timeout=300)
-        resp.raise_for_status()
-        return resp
-    except requests.exceptions.Timeout:
-        st.error("❌ 超时（300秒）")
-        return None
-    except requests.exceptions.ConnectionError:
-        st.error("❌ 无法连接，检查接口地址")
-        return None
-    except requests.exceptions.HTTPError as e:
-        code = e.response.status_code if e.response is not None else "?"
-        body = ""
+    max_retries = 3
+    for attempt in range(max_retries):
         try:
-            body = e.response.text[:500] if e.response is not None else ""
-        except:
-            pass
-        st.error(f"❌ HTTP {code}: {body}")
-        return None
-    except Exception as e:
-        st.error(f"❌ {type(e).__name__}: {e}")
-        return None
+            resp = requests.post(f"{api_base}/chat/completions", headers=headers, json=data, stream=True, timeout=300)
+            if resp.status_code == 429:
+                wait_time = (attempt + 1) * 30
+                st.warning(f"⚠️ API限流，{wait_time}秒后自动重试（第{attempt+1}/{max_retries}次）...")
+                time.sleep(wait_time)
+                continue
+            resp.raise_for_status()
+            return resp
+        except requests.exceptions.Timeout:
+            st.error("❌ 超时（300秒）")
+            return None
+        except requests.exceptions.ConnectionError:
+            st.error("❌ 无法连接，检查接口地址")
+            return None
+        except requests.exceptions.HTTPError as e:
+            code = e.response.status_code if e.response is not None else "?"
+            if code == 429:
+                wait_time = (attempt + 1) * 30
+                st.warning(f"⚠️ API限流，{wait_time}秒后自动重试（第{attempt+1}/{max_retries}次）...")
+                time.sleep(wait_time)
+                continue
+            body = ""
+            try:
+                body = e.response.text[:500] if e.response is not None else ""
+            except:
+                pass
+            st.error(f"❌ HTTP {code}: {body}")
+            return None
+        except Exception as e:
+            st.error(f"❌ {type(e).__name__}: {e}")
+            return None
+    st.error("❌ 多次重试仍被限流，请等待几分钟后再试")
+    return None
 
 def process_stream(response):
     if response is None:
@@ -584,6 +693,7 @@ def add_chapter(name, content):
         st.session_state.chapters[name] = content
         if name not in st.session_state.chapter_order:
             st.session_state.chapter_order.append(name)
+        auto_save()
         return True
     return False
 
@@ -592,6 +702,7 @@ def remove_chapter(name):
         del st.session_state.chapters[name]
         if name in st.session_state.chapter_order:
             st.session_state.chapter_order.remove(name)
+        auto_save()
 
 def get_combined_text(names=None):
     if names is None:
@@ -599,7 +710,7 @@ def get_combined_text(names=None):
     return "\n\n".join(f"【{n}】\n{st.session_state.chapters[n]}" for n in names if n in st.session_state.chapters)
 
 # ============================================================
-# 自动提取末尾分镜（新增功能）
+# 自动提取末尾分镜
 # ============================================================
 def extract_last_scenes(script, n=2):
     """从剧本中自动提取最后n个分镜"""
@@ -649,7 +760,6 @@ def build_episode_prompt(ep, text, opening="", prev_ending=""):
 📌 引爆：{mem['next_foreshadow']}
 📌 情绪：{mem['emotion_track']}"""
 
-    # 上集衔接信息
     prev_str = ""
     if prev_ending and prev_ending.strip():
         prev_str = f"""
@@ -869,26 +979,43 @@ with st.sidebar:
                 "reviews": {str(k): v for k, v in st.session_state.review_results.items()},
                 "memory": st.session_state.memory}, ensure_ascii=False, indent=2),
             file_name=f"剧本_{datetime.now().strftime('%m%d_%H%M')}.json", mime="application/json")
+
+    # 手动保存按钮
+    if st.button("💾 手动保存", use_container_width=True, key="sb_sv"):
+        auto_save()
+        st.success("✅ 已保存到本地")
+
+    # 安全重置（二次确认）
     if st.button("🗑️ 重置", use_container_width=True, key="sb_rs"):
         if st.session_state.get("confirm_reset"):
             data_keys = ["chapters", "chapter_order", "current_step", "current_episode",
                          "global_analysis", "opening_designs", "episodes", "review_results",
                          "memory", "messages", "chat_history", "mode",
-                         "selected_chapters_for_analysis", "prev_ending"]
+                         "selected_chapters_for_analysis", "confirm_reset",
+                         "_restore_attempted", "_just_restored"]
             for k in data_keys:
                 if k in st.session_state:
                     del st.session_state[k]
-            st.session_state["confirm_reset"] = False
+            clear_autosave()
             init_session_state()
             st.rerun()
         else:
             st.session_state["confirm_reset"] = True
-            st.warning("⚠️ 再次点击确认重置")
+            st.warning("⚠️ 再次点击确认重置（所有数据将清除）")
             st.rerun()
 
 # ============================================================
 # 顶部
 # ============================================================
+
+# 数据恢复提示
+if st.session_state.get("_just_restored"):
+    st.markdown("""<div class="restore-banner">
+    <span style="font-size:1.2rem;">🔄</span>
+    <span style="font-size:0.85rem;color:#276749;"><b>数据已自动恢复</b> — 检测到上次的工作数据，已自动载入。</span>
+    </div>""", unsafe_allow_html=True)
+    st.session_state["_just_restored"] = False
+
 step_names = ["导入章节", "全局提炼", "开场设计", "生成剧本", "质检优化"]
 current = st.session_state.current_step
 st.markdown(f"""<div class="header-bar"><div class="header-left">
@@ -1026,6 +1153,7 @@ with s2b:
                     st.session_state.global_analysis = f
                     st.session_state.messages = ms + [{"role": "assistant", "content": f}]
                     st.session_state.current_step = max(st.session_state.current_step, 1)
+                    auto_save()
                     st.success("✅ 完成！")
     elif st.session_state.global_analysis:
         with st.expander("📋 查看", expanded=False):
@@ -1054,7 +1182,7 @@ with t3:
 {"<span class='tag tag-green'>✅提炼</span>" if ad else "<span class='tag tag-yellow'>⚠️未提炼</span>"}</div>""", unsafe_allow_html=True)
 
 # ============================================================
-# 上集衔接区域（新增功能）
+# 上集衔接区域
 # ============================================================
 with st.expander("🔗 上集衔接（可选）", expanded=False):
     auto_ending = st.session_state.memory.get("last_ending", "")
@@ -1065,13 +1193,14 @@ with st.expander("🔗 上集衔接（可选）", expanded=False):
         "上集末尾内容（最后1-3个分镜）",
         value=auto_ending,
         height=150,
-        key="prev_ending",
+        key="prev_ending_input",
         help="粘贴上一集最后的分镜内容，AI会据此衔接。留空=第一集或新篇章开始",
         placeholder="留空表示不需要衔接（第一集或新篇章）\n\n或粘贴上一集最后的分镜内容，例如：\n【分镜11】（实算12.5s）\n场景：衣柜内外 · 傍晚...\n秦洛（咬牙切齿）：\"啧！你一个丧尸卖什么萌啊？\"\n..."
     )
 
     if st.button("🗑️ 清空衔接", key="clear_prev", help="清空表示新篇章开始"):
         st.session_state.memory["last_ending"] = ""
+        auto_save()
         st.rerun()
 
 # ============================================================
@@ -1104,6 +1233,7 @@ with mt[0]:
                         st.session_state.opening_designs = f
                         st.session_state.messages = ms + [{"role": "assistant", "content": f}]
                         st.session_state.current_step = max(st.session_state.current_step, 2)
+                        auto_save()
                         st.success("✅")
 
     if bt["生成剧本"]:
@@ -1112,7 +1242,7 @@ with mt[0]:
         else:
             tx = get_combined_text(ec if ec else None)
             op = st.session_state.get("selected_opening", "")
-            pe = st.session_state.get("prev_ending", "")
+            pe = prev_ending if prev_ending else ""
             pr = build_episode_prompt(en, tx, op, pe)
             cx = st.session_state.messages + [{"role": "user", "content": pr}]
             with st.spinner(f"🎬 第{en}集..."):
@@ -1128,6 +1258,7 @@ with mt[0]:
                         last_scenes = extract_last_scenes(f, n=2)
                         if last_scenes:
                             st.session_state.memory["last_ending"] = last_scenes
+                        auto_save()
                         st.success(f"✅ 第{en}集完成！")
                     else:
                         st.warning("⚠️ 空")
@@ -1158,6 +1289,7 @@ with mt[0]:
                             last_scenes = extract_last_scenes(f, n=2)
                             if last_scenes:
                                 st.session_state.memory["last_ending"] = last_scenes
+                            auto_save()
                             st.success(f"✅ 第{e}集")
                         else:
                             st.warning(f"⚠️ 第{e}集空")
@@ -1181,6 +1313,7 @@ with mt[0]:
                         last_scenes = extract_last_scenes(f, n=2)
                         if last_scenes:
                             st.session_state.memory["last_ending"] = last_scenes
+                        auto_save()
                         st.success("✅ 台词优化完成（角色DNA驱动）")
         else:
             st.warning(f"⚠️ 第{en}集未生成")
@@ -1200,6 +1333,7 @@ with mt[0]:
                         last_scenes = extract_last_scenes(f, n=2)
                         if last_scenes:
                             st.session_state.memory["last_ending"] = last_scenes
+                        auto_save()
                         st.success("✅ 画面优化完成")
         else:
             st.warning(f"⚠️ 第{en}集未生成")
@@ -1219,6 +1353,7 @@ with mt[0]:
                         last_scenes = extract_last_scenes(f, n=2)
                         if last_scenes:
                             st.session_state.memory["last_ending"] = last_scenes
+                        auto_save()
                         st.success("✅ 情绪优化完成")
         else:
             st.warning(f"⚠️ 第{en}集未生成")
@@ -1242,8 +1377,7 @@ with mt[0]:
                 with d1:
                     st.download_button(f"📥 导出", s, f"第{e}集.md", "text/markdown", key=f"dl{e}")
                 with d2:
-                    with st.popover("📋 纯文本"):
-                        st.code(s, language="markdown")
+                    st.download_button("📋 纯文本", s, f"第{e}集_纯文本.txt", "text/plain", key=f"cd{e}")
     else:
         st.markdown("""<div class="empty-state"><div class="empty-icon">🎬</div><div class="empty-text">尚未生成</div></div>""", unsafe_allow_html=True)
 
@@ -1253,8 +1387,8 @@ with mt[1]:
             st.warning(f"⚠️ 第{en}集未生成")
         else:
             tx = get_combined_text(ec if ec else None)
-            sc = st.session_state.episodes[en]
-            rm = [{"role": "user", "content": build_review_prompt(en, sc, tx)}]
+            sc_text = st.session_state.episodes[en]
+            rm = [{"role": "user", "content": build_review_prompt(en, sc_text, tx)}]
             og = st.session_state.model_id
             if st.session_state.review_model:
                 st.session_state.model_id = st.session_state.review_model
@@ -1266,6 +1400,7 @@ with mt[1]:
                     if f:
                         st.session_state.review_results[en] = f
                         st.session_state.current_step = max(st.session_state.current_step, 4)
+                        auto_save()
                         st.success(f"✅ 第{en}集质检完成")
             st.session_state.model_id = og
 
@@ -1297,6 +1432,7 @@ with mt[1]:
                                     last_scenes = extract_last_scenes(f, n=2)
                                     if last_scenes:
                                         st.session_state.memory["last_ending"] = last_scenes
+                                    auto_save()
                                     st.success(f"✅ 已修改")
                 with f2:
                     st.download_button("📥", rv, f"第{e}集_质检.md", "text/markdown", key=f"dr{e}")
@@ -1321,6 +1457,7 @@ with mt[2]:
             if st.button("✅", key="cf", use_container_width=True, type="primary"):
                 if ch:
                     st.session_state["selected_opening"] = ch
+                    auto_save()
                     st.success(f"✅ {ch}")
     else:
         st.markdown("""<div class="empty-state"><div class="empty-icon">🎯</div><div class="empty-text">待设计</div></div>""", unsafe_allow_html=True)
@@ -1347,6 +1484,7 @@ with mt[3]:
                 f = stream_to_container(r, co)
                 if f:
                     st.session_state.chat_history.append({"role": "assistant", "content": f})
+                    auto_save()
 
 with mt[4]:
     st.markdown("### 📊 总览")
