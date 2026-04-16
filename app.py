@@ -1423,42 +1423,27 @@ with mt[0]:
     else:
         st.markdown("""<div class="empty-state"><div class="empty-icon">🎬</div><div class="empty-text">尚未生成</div></div>""", unsafe_allow_html=True)
 
-with f1:
-                    if st.button(f"🔧 自动修改", key=f"fx{e}", type="primary"):
-                        fp = f"""根据质检修改第{e}集所有7分以下项。
-
-【修改格式要求】
-1. 台词必须嵌入画面动作流（不能单独分行）
-2. 每句台词前必须有情绪+表情+身体描写
-3. 时长必须实算
-4. 台词个性化（不能统一精简）
-
-质检：\n{rv}\n原剧本：\n{st.session_state.episodes[e]}\n输出修改后完整剧本。"""
-                        fm = st.session_state.messages + [{"role": "user", "content": fp}]
-                        with st.spinner("🔧..."):
-                            r = call_api_streaming(fm)
-                            if r:
-                                co = st.empty()
-                                f = stream_to_container(r, co)
-                                if f:
-                                    # --- 纯净版剧本提取器 ---
-                                    final_script = f
-                                    match = re.search(r'【分镜\s*1?】', f)
-                                    if match:
-                                        final_script = f[match.start():].strip()
-                                    
-                                    # 更新剧本内容为纯净版
-                                    st.session_state.episodes[e] = final_script
-                                    
-                                    # 更新记忆库的末尾分镜
-                                    last_scenes = extract_last_scenes(final_script, n=2)
-                                    if last_scenes:
-                                        st.session_state.memory["last_ending"] = last_scenes
-                                        
-                                    # --- 强制UI刷新 ---
-                                    st.success(f"✅ 第{e}集修改已保存！正在刷新...")
-                                    time.sleep(1.5)
-                                    st.rerun()
+with mt[1]:
+    if bt["质量检查"]:
+        if en not in st.session_state.episodes:
+            st.warning(f"⚠️ 第{en}集未生成")
+        else:
+            tx = get_combined_text(ec if ec else None)
+            sc_text = st.session_state.episodes[en]
+            rm = [{"role": "user", "content": build_review_prompt(en, sc_text, tx)}]
+            og = st.session_state.model_id
+            if st.session_state.review_model:
+                st.session_state.model_id = st.session_state.review_model
+            with st.spinner(f"🔍 质检第{en}集..."):
+                r = call_api_streaming(rm, REVIEW_SYSTEM_PROMPT)
+                if r:
+                    co = st.empty()
+                    f = stream_to_container(r, co)
+                    if f:
+                        st.session_state.review_results[en] = f
+                        st.session_state.current_step = max(st.session_state.current_step, 4)
+                        auto_save()
+                        st.success(f"✅ 第{en}集质检完成")
             st.session_state.model_id = og
 
     if st.session_state.review_results:
