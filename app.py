@@ -1436,14 +1436,29 @@ with mt[1]:
                 st.session_state.model_id = st.session_state.review_model
             with st.spinner(f"🔍 质检第{en}集..."):
                 r = call_api_streaming(rm, REVIEW_SYSTEM_PROMPT)
-                if r:
-                    co = st.empty()
-                    f = stream_to_container(r, co)
-                    if f:
-                        st.session_state.review_results[en] = f
-                        st.session_state.current_step = max(st.session_state.current_step, 4)
-                        auto_save()
-                        st.success(f"✅ 第{en}集质检完成")
+               if r:
+                                co = st.empty()
+                                f = stream_to_container(r, co)
+                                if f:
+                                    # --- 新增：纯净版剧本提取器 ---
+                                    # 防止AI输出的“【编剧内心独白】”等前言污染最终剧本
+                                    final_script = f
+                                    match = re.search(r'【分镜\s*1?】', f) # 寻找第一个分镜的开头
+                                    if match:
+                                        final_script = f[match.start():].strip() # 只截取分镜及之后的内容
+                                    
+                                    # 更新剧本内容为纯净版
+                                    st.session_state.episodes[e] = final_script
+                                    
+                                    # 更新记忆库的末尾分镜
+                                    last_scenes = extract_last_scenes(final_script, n=2)
+                                    if last_scenes:
+                                        st.session_state.memory["last_ending"] = last_scenes
+                                        
+                                    # --- 新增：强制UI刷新 ---
+                                    st.success(f"✅ 第{e}集修改已自动保存！正在刷新剧本界面...")
+                                    time.sleep(1.5) # 停顿1.5秒让用户看清提示
+                                    st.rerun() # 强制刷新整个网页，同步更新“剧本”Tab
             st.session_state.model_id = og
 
     if st.session_state.review_results:
