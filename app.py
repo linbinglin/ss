@@ -88,6 +88,8 @@ def auto_restore():
         if data.get("chat_history"):
             st.session_state["chat_history"] = data["chat_history"]
         # 恢复 AI分镜相关字段
+    except Exception:
+        return False
     raw_prompts = data.get("scene_prompts", {})
     # JSON 保存后 key 变成字符串，这里转回 int
     st.session_state.scene_prompts = {
