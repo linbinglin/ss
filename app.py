@@ -37,11 +37,6 @@ def auto_save():
             "memory": st.session_state.get("memory", {}),
             "messages": st.session_state.get("messages", []),
             "chat_history": st.session_state.get("chat_history", []),
-            # === 新增：AI分镜相关字段 ===
-            "scene_prompts": {str(k): v for k, v in st.session_state.get("scene_prompts", {}).items()},
-            "selected_style": st.session_state.get("selected_style", "温馨日常"),
-            "scene_prompt_episode": st.session_state.get("scene_prompt_episode", 1),
-            "auto_recommended_style": st.session_state.get("auto_recommended_style", None),
             "save_time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
         }
         with open(AUTOSAVE_FILE, "w", encoding="utf-8") as f:
@@ -92,14 +87,6 @@ def auto_restore():
             st.session_state["messages"] = data["messages"]
         if data.get("chat_history"):
             st.session_state["chat_history"] = data["chat_history"]
-        # === 新增：恢复AI分镜相关字段 ===
-        raw_prompts = data.get("scene_prompts", {})
-        st.session_state["scene_prompts"] = {
-            int(k): v for k, v in raw_prompts.items()
-        } if raw_prompts else {}
-        st.session_state["selected_style"] = data.get("selected_style", "温馨日常")
-        st.session_state["scene_prompt_episode"] = data.get("scene_prompt_episode", 1)
-        st.session_state["auto_recommended_style"] = data.get("auto_recommended_style", None)
         return True
     except Exception:
         return False
@@ -287,13 +274,22 @@ SYSTEM_PROMPT = """【微短剧生成 3.1 系统指令】
 ❌ 台词和画面分开写——必须嵌入画面流中
 
 ═══════════════════════════════════════
-★★★ 剧本格式铁律（最重要的格式规范）★★★
+★★★ 分镜格式铁律（最重要的格式规范）★★★
 ═══════════════════════════════════════
 
 【铁律A：台词必须嵌入画面动作流中】
 
 台词不是单独一行，台词必须出现在它被说出的那个精确时间位置上，
 和此刻正在发生的动作、表情、身体状态写在一起。
+
+❌ 绝对禁止的格式（台词与画面分离）：
+```
+画面：[秦洛打响指，电流在指尖炸开，许多多被吓得后弹]
+秦洛："看，技能点。"
+许多多OS：（他有异能？！）
+音效：电流滋滋声
+```
+问题：读者/导演不知道"看，技能点"这句话是在打响指前说的？还是后弹之后说的？
 
 ✅ 正确格式（台词嵌入动作流的精确时间点）：
 ```
@@ -338,7 +334,7 @@ SYSTEM_PROMPT = """【微短剧生成 3.1 系统指令】
 
 【铁律D：好莱坞级动作奇观与镜头语法（视觉爆发力法则）】
 当遇到射击、异能释放、巨兽袭击等战斗时刻，绝对禁止平铺直叙！
-必须调用以下"高级镜头调度语法"，制造强烈的视觉冲击力：
+必须调用以下“高级镜头调度语法”，制造强烈的视觉冲击力：
 
 1. 【子弹时间（Bullet Time）与微距跟踪】：
 必须写出时间膨胀感。例如：慢动作特写子弹出膛，枪口震荡出扭曲的空气涟漪（空气阻力），镜头死死死贴着高速旋转的弹头（跟踪镜头），随后瞬间恢复正常语速，子弹狠狠掼入目标。
@@ -358,7 +354,7 @@ SYSTEM_PROMPT = """【微短剧生成 3.1 系统指令】
 【镜头死死跟踪弹头】子弹在半空划出致命的红线，瞬间加速（快慢切）——噗嗤！精准绞碎变异巨象布满血丝的右眼！（1s）
 
 【铁律F：真实三维物理与空间逻辑法则（反降智/反常识预警）】
-AI经常因为追求"动作酷炫"而写出违背人体工学和物理常识的动作（例如：坐在越野车副驾驶的人，由于腿部空间受限，绝对不可能用脚直接踹回头顶的天窗！这属于毫无常识的低级漏洞）。
+AI经常因为追求“动作酷炫”而写出违背人体工学和物理常识的动作（例如：坐在越野车副驾驶的人，由于腿部空间受限，绝对不可能用脚直接踹回头顶的天窗！这属于毫无常识的低级漏洞）。
 
 在编写任何动作前，必须在脑中运行【三维物理模拟器】：
 1. 【空间与人体工学】：角色所处的空间有多大？姿势是什么？（狭窄车厢内无法挥舞长柄武器；坐姿无法向正上方高抬腿踹门；打开车顶天窗在真实情况中只能是用手砸/推）。
@@ -368,13 +364,13 @@ AI经常因为追求"动作酷炫"而写出违背人体工学和物理常识的�
 
 🚨 强制指令：如果小说原著的描写本身违背了物理常识或逻辑漏洞，你必须在影视化翻译时，【自动将其修正】为符合真实物理逻辑的动作！绝对不允许照搬原著的降智设定！
 
-【铁律G：反应镜头与"活体"法则（严禁角色道具化）】
-AI常犯的致命错误：只描写正在说话或打斗的人，把旁边不说话、或者处于"被抱着/背着/牵着"的角色写成没有生命的"木头"或"背包"，导致角色看起来极度空洞、像个假人。
+【铁律G：反应镜头与“活体”法则（严禁角色道具化）】
+AI常犯的致命错误：只描写正在说话或打斗的人，把旁边不说话、或者处于“被抱着/背着/牵着”的角色写成没有生命的“木头”或“背包”，导致角色看起来极度空洞、像个假人。
 在影视剧中，只要角色在画面内，哪怕是背景板，哪怕不说话，也必须有属于角色性格的描述！
 
 🚨 强制指令：
 1. 【非说话者的反应镜头】：当A在长篇大论或激烈行动时，必须给画面内的B（尤其是核心角色）穿插0.5-1.5秒的【反应镜头】（微表情、翻白眼、手指抓紧、眼神躲闪或呼吸变化）。
-2. 【被动状态的微细节】：如果角色处于"被抱着/拉着"的被动状态（如丧尸许多多），必须描写她/他的身体反馈和感官动作。
+2. 【被动状态的微细节】：如果角色处于“被抱着/拉着”的被动状态（如丧尸许多多），必须描写她/他的身体反馈和感官动作。
 ❌ 错误的空洞描写（像抱了个道具）：秦洛单臂托抱着许多多，大步流星走着。陈小飞跑过来说话。
 ✅ 正确的活体描写（鲜活感拉满）：秦洛单臂托抱着许多多往前走。许多多像无尾熊一样死死搂着他的脖子，灰蒙蒙的眼睛滴溜溜地四下乱转，听到陈小飞激动的声音时，她迟钝地歪了歪脑袋，咬了咬自己的手指（1.5s）。
 
@@ -382,7 +378,7 @@ AI常犯的致命错误：只描写正在说话或打斗的人，把旁边不说
 灵魂锚定
 ═══════════════════════════════════════
 你不是在"把小说改成剧本"。你是在替这些角色活一遍。
-产品规格： 无第三人称旁白 | 集集强钩子。
+产品规格：每集分镜数量10~15个 | 无第三人称旁白 | 集集强钩子。
 
 ═══════════════════════════════════════
 五条创作铁律
@@ -390,8 +386,6 @@ AI常犯的致命错误：只描写正在说话或打斗的人，把旁边不说
 ①【人设即法律】角色的性格、说话方式、行为逻辑必须95%忠于原著。
 ②【外化】一切"想、觉得、心痛、暗爽"必须转化为可拍摄的具体画面。允许第一人称内心OS，严禁第三人称旁白。
 ③【伏笔】每一个重大转折之前，必须存在至少一个视觉/听觉微伏笔。
-④【潜台词】角色嘴上说的话与真实意图之间必须存在缝隙。台词传递表面意思，身体泄露真相。
-⑤【钩子铁律】前15秒必须制造具体的疑问或情绪冲击。每集结尾必须制造悬念。集内至少一次情绪急转。
 
 ═══════════════════════════════════════
 角色驱动卡系统
@@ -453,70 +447,6 @@ AI常犯的致命错误：只描写正在说话或打斗的人，把旁边不说
 【第3轮：剧本生成】编剧内心独白+结构速写+角色调用+影视化排雷+完整分镜
 【第4轮：自检与优化】五个敌对视角+量化打分+细节清单"""
 
-
-# ============================================================
-# AI分镜风格前缀库（8种）
-# ============================================================
-STYLE_PREFIXES = {
-    "温馨日常": "[温馨日常：暖色调，自然光，柔和，明亮通透]",
-    "末日废土": "[末日废土：冷色调，灰蒙天空，颓败感，颗粒质感]",
-    "悬疑惊悚": "[悬疑惊悚：低饱和，强光影对比，冷蓝调，阴影浓重]",
-    "古风武侠": "[古风武侠：水墨质感，青绿色调，写意光影，飘逸感]",
-    "都市青春": "[都市青春：明亮清新，高饱和色彩，日光明媚，活力感]",
-    "赛博朋克": "[赛博朋克：霓虹灯光，青紫色调，雨夜反光，未来感]",
-    "甜宠浪漫": "[甜宠浪漫：柔光滤镜，粉色氛围，梦幻暖调，奶油质感]",
-    "硬核战斗": "[硬核战斗：高对比度，金属质感，爆炸火光，冷硬色调]",
-}
-
-STYLE_LIST = list(STYLE_PREFIXES.keys())
-
-
-# ============================================================
-# AI分镜 Prompt 生成 System Prompt
-# ============================================================
-SCENE_PROMPT_SYSTEM = """你是一位专业的AI视频分镜导演，专门将微短剧剧本转换为可直接投喂给"即梦 Seedance 2.0"等AI视频工具的 prompt 序列。
-
-【核心任务】
-将给定的一集剧本，切分为 12-18 条独立的 AI 视频 prompt。每条 prompt 对应一个"可独立生成的视频片段"（约 3-8 秒）。
-
-【切分原则】
-1. 按场景切换点切分：场景变化、景别变化、角色进出画面、重大情绪转折都是切分点
-2. 每条 prompt 覆盖一个完整的"视觉单元"（一个连续动作 or 一段完整对话交互）
-3. 理想数量：12-18 条/集。少于 10 条说明密度不足，多于 22 条说明切碎了
-
-【每条 prompt 的结构】
-Prompt #X
-景别衔接动词 + 场景环境 + 角色描述（外貌+服装+表情+动作）+ 台词/OS + 镜头运动 + 光影氛围
-
-【关键要求】
-1. 景别衔接：每条 prompt 用"推镜/拉镜/横摇/跟拍/切至特写/切至中景/切至全景"等衔接动词开头
-2. 角色外观一致性：每次出现主要角色，都要简短描述其外观特征（如"黑色战术外套的秦洛"），确保 AI 视频生成时角色一致
-3. OS 处理：内心独白必须明确标注"画外音/OS（未张嘴）"，避免 AI 把 OS 当成张嘴说话
-4. 台词：直接写在 prompt 里，格式："角色名（表情/状态）：'台词内容'"
-5. 镜头语言：每条至少包含一个镜头术语（特写/中景/全景/跟镜/推镜/俯拍/仰拍/手持晃动等）
-6. 光影：每条标注光源（自然光/霓虹光/烛光/冷光/暖光等）
-7. 单条字数：300-800 字符为宜，不要超过 2000
-
-【输出格式】
-严格按如下格式输出，每条 prompt 之间用空行隔开：
-
-Prompt #1
-[prompt 正文]
-
-Prompt #2
-[prompt 正文]
-
-...
-
-【严禁事项】
-❌ 不要在 prompt 开头加风格前缀（风格前缀由系统自动注入）
-❌ 不要输出"以下是 prompt"之类的开场白
-❌ 不要在最后加总结
-❌ 不要使用 markdown 标题、加粗等格式
-✅ 只输出纯 prompt 序列，每条以 "Prompt #数字" 开头
-"""
-
-
 REVIEW_SYSTEM_PROMPT = """你是一个专业的微短剧分镜质检专家。对照小说原文，对每一条分镜进行严格的质量检查。
 
 必须切换为以下五个敌对视角，逐一对整集发起攻击：
@@ -555,7 +485,7 @@ REVIEW_SYSTEM_PROMPT = """你是一个专业的微短剧分镜质检专家。对
 - 演员拿到这个剧本，能不能直接演？还是会来问我"这里怎么演"？
 - 整集的视觉风格统一吗？有没有某个分镜画风突变？
 - 如果只能保留3个分镜，我保留哪3个？其余的有没有可以合并或删除的？
-- 画面里的"不说话"或处于"被动（被抱/被牵/）"的角色，是否被忽略，没有给符合（剧情/性格）的（微表情/动作）和反应镜头？
+- 画面里的“不说话”或处于“被动（被抱/被牵/）”的角色，是否被忽略，没有给符合（剧情/性格）的（微表情/动作）和反应镜头？
 - 输出：作为导演，我最想重拍的是分镜______，最满意的是分镜______
 
 【重点检查项：台词三合一】
@@ -587,11 +517,6 @@ def init_session_state():
         "messages": [], "chat_history": [],
         "mode": "默认", "selected_chapters_for_analysis": [],
         "review_model": None,
-        # === 新增：AI分镜相关 ===
-        "scene_prompts": {},
-        "selected_style": "温馨日常",
-        "scene_prompt_episode": 1,
-        "auto_recommended_style": None,
     }
     for k, v in defaults.items():
         if k not in st.session_state:
@@ -795,16 +720,7 @@ def build_analysis_prompt(text):
 4. 必须保留的核心情节节点（10-20个）
 5. 需要补充的逻辑链节点
 6. 全剧环境/氛围基调 + 天气光影变化建议
-7. 视觉强场景与短剧记忆点（5-8个瞬间，每个3-5句具体画面描述）
-8. 【推荐视觉风格】：从以下 8 种风格中推荐 1 种最适合本剧的视觉风格，并说明理由。格式必须严格为"【推荐风格：XXX】"（XXX 必须精确匹配下列选项之一）：
-   - 温馨日常
-   - 末日废土
-   - 悬疑惊悚
-   - 古风武侠
-   - 都市青春
-   - 赛博朋克
-   - 甜宠浪漫
-   - 硬核战斗"""
+7. 视觉强场景与短剧记忆点（5-8个瞬间，每个3-5句具体画面描述）"""
 
 def build_opening_prompt():
     return """请执行【第2轮：开场手法设计】
@@ -870,7 +786,7 @@ def build_episode_prompt(ep, text, opening="", prev_ending=""):
 4. 音效用（）标注在发声动作旁边
 
 5.遇到动作戏/危机爆发，必须写出专业镜头语句，并强制调用【好莱坞级镜头语法】：
-   - 必须出现"特写"、"跟踪镜头"、"慢动作/子弹时间"、"极速推拉"等导演术语！
+   - 必须出现“特写”、“跟踪镜头”、“慢动作/子弹时间”、“极速推拉”等导演术语！
    - 必须描写空气扭曲、后坐力、弹道轨迹、巨兽体型压迫感等视觉奇观！
    - 你可以用100-200字去极致描绘一发子弹破空的空气阻力，即使这段描写的实算时长只有2-3秒。
 
@@ -878,11 +794,12 @@ def build_episode_prompt(ep, text, opening="", prev_ending=""):
    - 写每一个动作前，检查是否符合物理常识（副驾驶怎么踹天窗？手被绑在背后怎么开枪？）。
    - 发现原著有逻辑硬伤，必须自动用符合常识的合理动作替换，并在内心独白的【影视化排雷】中注明修改原因
 
-7.严禁角色"道具化"发呆：
+7.严禁角色“道具化”发呆：
    - 画面中如果不说话的核心角色（特别是被抱着/牵引着的角色/站着背景的角色），绝对不能变成空洞的背景板！
    - 必须强制穿插他们的【反应镜头】（微表情/眼神乱转/小动作/身体反馈），赋予他们鲜活的生命感！
 
 示范格式：
+【分镜x】
 [角色动作描写]——
 [继续动作/变化]（音效：xxx）。
 角色A（情绪描写+表情+身体状态）："台词内容"
@@ -992,104 +909,6 @@ def build_emotion_optimization_prompt(ep, script):
 
 输出优化后完整剧本，修改处标注【❤️】。"""
 
-
-# ============================================================
-# AI分镜 Prompt 相关函数
-# ============================================================
-def build_scene_prompt_generation(episode_script, episode_num):
-    """构建将剧本转换为 AI 分镜 prompt 的指令"""
-    return f"""请将以下第 {episode_num} 集的分镜剧本转换为 12-18 条独立的 AI 视频 prompt 序列。
-
-【剧本内容】
-{episode_script}
-
-【输出要求】
-1. 严格按 "Prompt #1 / Prompt #2 / ..." 的格式
-2. 每条 prompt 开头使用景别衔接动词（推镜/拉镜/横摇/跟拍/切至特写/切至中景/切至全景等）
-3. 主要角色首次出现时用简短外观描述（如"黑色战术外套的秦洛"）
-4. OS 必须明确标注"画外音/OS（未张嘴）"
-5. 台词写入 prompt 内：角色名（状态）："台词"
-6. 每条包含镜头术语+光源+场景+动作+台词/OS
-7. 单条 300-800 字符，不要超过 2000
-8. 不要加风格前缀（系统会自动注入）
-9. 不要有开场白和总结，直接输出 prompt 序列"""
-
-
-def split_scene_prompts(ai_output):
-    """将 AI 输出切分为 prompt 列表"""
-    if not ai_output:
-        return []
-    # 用 Prompt #数字 作为切分标记
-    parts = re.split(r'\n*Prompt\s*#?\s*\d+\s*\n', ai_output)
-    # 第一项通常是空字符串或开场白，过滤掉
-    prompts = [p.strip() for p in parts if p.strip() and len(p.strip()) > 20]
-    return prompts
-
-
-def inject_style_prefix(prompts, style_name):
-    """为每条 prompt 注入风格前缀"""
-    if not prompts:
-        return []
-    prefix = STYLE_PREFIXES.get(style_name, "")
-    if not prefix:
-        return prompts
-    return [f"{prefix}\n{p}" for p in prompts]
-
-
-def extract_recommended_style(global_analysis):
-    """从全局提炼结果中提取推荐风格"""
-    if not global_analysis:
-        return None
-    # 匹配【推荐风格：XXX】
-    match = re.search(r'【推荐风格[:：]\s*([^】\s]+)\s*】', global_analysis)
-    if match:
-        style = match.group(1).strip()
-        if style in STYLE_LIST:
-            return style
-    # 备用：只要提到某个风格名就采用
-    for style in STYLE_LIST:
-        if style in global_analysis:
-            return style
-    return None
-
-
-def export_prompts_txt(prompts, style_name, episode_num):
-    """导出 prompt 为 txt 文本"""
-    lines = [
-        f"第 {episode_num} 集 AI 分镜 Prompt 序列",
-        f"风格：{style_name}",
-        f"生成时间：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}",
-        f"共 {len(prompts)} 条",
-        "═" * 60,
-        ""
-    ]
-    for i, p in enumerate(prompts, 1):
-        lines.append(f"【Prompt #{i:02d}】")
-        lines.append(p)
-        lines.append("")
-        lines.append("═" * 60)
-        lines.append("")
-    return "\n".join(lines)
-
-
-def build_single_prompt_regenerate(original_prompt, episode_script, prompt_index, style_name):
-    """重新生成单条 prompt"""
-    return f"""请为第 {prompt_index} 条 AI 分镜 prompt 提供一个更优版本。
-
-【当前 prompt】
-{original_prompt}
-
-【参考剧本上下文】
-{episode_script[:3000]}
-
-【要求】
-1. 保持原 prompt 覆盖的剧情片段不变
-2. 优化景别衔接、角色描述、镜头语言、光影氛围
-3. 300-800 字符
-4. 不要加风格前缀
-5. 直接输出新 prompt 正文，不要加 "Prompt #X" 前缀，不要加解释"""
-
-
 # ============================================================
 # 侧边栏
 # ============================================================
@@ -1131,23 +950,6 @@ with st.sidebar:
     md = st.radio("", ["📋 默认", "⚡ 快速"], key="sb_md", label_visibility="collapsed")
     st.session_state.mode = "默认" if "默认" in md else "快速"
 
-    # === 新增：AI分镜风格设置 ===
-    st.markdown("---")
-    st.markdown('<div class="sidebar-group-title">🎞️ AI分镜设置</div>', unsafe_allow_html=True)
-    rec_style = st.session_state.get("auto_recommended_style")
-    default_idx = STYLE_LIST.index(st.session_state.selected_style) if st.session_state.selected_style in STYLE_LIST else 0
-    new_style = st.selectbox(
-        "默认视觉风格", options=STYLE_LIST, index=default_idx, key="sb_style",
-        help="AI分镜 prompt 生成时使用的风格前缀。可在 AI分镜 Tab 内临时切换。"
-    )
-    if new_style != st.session_state.selected_style:
-        st.session_state.selected_style = new_style
-    if rec_style and rec_style != st.session_state.selected_style:
-        st.info(f"💡 AI 推荐：**{rec_style}**")
-        if st.button("采用推荐", use_container_width=True, key="sb_adopt"):
-            st.session_state.selected_style = rec_style
-            st.rerun()
-
     st.markdown("---")
     st.markdown('<div class="sidebar-group-title">💾 数据</div>', unsafe_allow_html=True)
     if st.button("📌 全局记忆", use_container_width=True, key="sb_me"):
@@ -1172,9 +974,7 @@ with st.sidebar:
                          "global_analysis", "opening_designs", "episodes", "review_results",
                          "memory", "messages", "chat_history", "mode",
                          "selected_chapters_for_analysis", "confirm_reset",
-                         "_restore_attempted", "_just_restored",
-                         "scene_prompts", "selected_style", "scene_prompt_episode",
-                         "auto_recommended_style"]
+                         "_restore_attempted", "_just_restored"]
             for k in data_keys:
                 if k in st.session_state:
                     del st.session_state[k]
@@ -1335,12 +1135,6 @@ with s2b:
                     st.session_state.global_analysis = f
                     st.session_state.messages = ms + [{"role": "assistant", "content": f}]
                     st.session_state.current_step = max(st.session_state.current_step, 1)
-                    # === 新增：自动提取推荐风格 ===
-                    rec = extract_recommended_style(f)
-                    if rec:
-                        st.session_state.auto_recommended_style = rec
-                        if st.session_state.selected_style == "温馨日常":
-                            st.session_state.selected_style = rec
                     auto_save()
                     st.success("✅ 完成！")
     elif st.session_state.global_analysis:
@@ -1349,6 +1143,7 @@ with s2b:
         st.markdown('<span class="tag tag-green">✅ 完成</span>', unsafe_allow_html=True)
     else:
         st.markdown("""<div class="empty-state"><div class="empty-icon">🔍</div><div class="empty-text">等待</div></div>""", unsafe_allow_html=True)
+
 # ============================================================
 # 步骤三
 # ============================================================
@@ -1401,9 +1196,9 @@ for i, (ic, lb) in enumerate(bd):
         bt[lb] = st.button(f"{ic} {lb}", key=f"b_{lb}", use_container_width=True, type="primary" if lb == "生成剧本" else "secondary")
 
 # ============================================================
-# 主Tabs（新增 🎞️ AI分镜）
+# 主Tabs
 # ============================================================
-mt = st.tabs(["📝 剧本", "🔍 质检", "🎯 开场", "💬 对话", "🎞️ AI分镜", "📊 总览"])
+mt = st.tabs(["📝 剧本", "🔍 质检", "🎯 开场", "💬 对话", "📊 总览"])
 
 with mt[0]:
     if bt["设计开场"]:
@@ -1615,18 +1410,25 @@ with mt[1]:
                                 co = st.empty()
                                 f = stream_to_container(r, co)
                                 if f:
+                                    # --- 新增：纯净版剧本提取器 ---
+                                    # 防止AI输出的“【编剧内心独白】”等前言污染最终剧本
                                     final_script = f
-                                    match = re.search(r'【分镜\s*1?】', f)
+                                    match = re.search(r'【分镜\s*1?】', f) # 寻找第一个分镜的开头
                                     if match:
-                                        final_script = f[match.start():].strip()
+                                        final_script = f[match.start():].strip() # 只截取分镜及之后的内容
+                                    
+                                    # 更新剧本内容为纯净版
                                     st.session_state.episodes[e] = final_script
+                                    
+                                    # 更新记忆库的末尾分镜
                                     last_scenes = extract_last_scenes(final_script, n=2)
                                     if last_scenes:
                                         st.session_state.memory["last_ending"] = last_scenes
-                                    auto_save()
+                                        
+                                    # --- 新增：强制UI刷新 ---
                                     st.success(f"✅ 第{e}集修改已自动保存！正在刷新剧本界面...")
-                                    time.sleep(1.5)
-                                    st.rerun()
+                                    time.sleep(1.5) # 停顿1.5秒让用户看清提示
+                                    st.rerun() # 强制刷新整个网页，同步更新“剧本”Tab
                 with f2:
                     st.download_button("📥", rv, f"第{e}集_质检.md", "text/markdown", key=f"dr{e}")
                 with f3:
@@ -1679,202 +1481,7 @@ with mt[3]:
                     st.session_state.chat_history.append({"role": "assistant", "content": f})
                     auto_save()
 
-# ============================================================
-# 🎞️ AI分镜 Tab（新增）
-# ============================================================
 with mt[4]:
-    # 懒初始化（兜底，防止 KeyError）
-    st.session_state.setdefault("scene_prompts", {})
-    st.session_state.setdefault("selected_style", "温馨日常")
-    st.session_state.setdefault("scene_prompt_episode", 1)
-    st.session_state.setdefault("auto_recommended_style", None)
-
-    # 懒触发推荐风格提取
-    if st.session_state.get("global_analysis") and not st.session_state.auto_recommended_style:
-        rec = extract_recommended_style(st.session_state.global_analysis)
-        if rec:
-            st.session_state.auto_recommended_style = rec
-
-    st.markdown("### 🎞️ AI分镜 Prompt 生成")
-    st.caption("将剧本转换为可直接粘贴到「即梦 Seedance 2.0」的 prompt 序列")
-
-    if not st.session_state.episodes:
-        st.warning("⚠️ 请先在「📝 剧本」Tab 生成至少一集剧本")
-    else:
-        ep_numbers = sorted(st.session_state.episodes.keys())
-
-        # 顶部控制区
-        sc1, sc2, sc3 = st.columns([2, 2, 2])
-        with sc1:
-            default_ep_idx = ep_numbers.index(st.session_state.scene_prompt_episode) \
-                if st.session_state.scene_prompt_episode in ep_numbers else 0
-            selected_ep = st.selectbox(
-                "选择集数",
-                options=ep_numbers,
-                index=default_ep_idx,
-                format_func=lambda x: f"第 {x} 集",
-                key="sp_ep_selector"
-            )
-            if selected_ep != st.session_state.scene_prompt_episode:
-                st.session_state.scene_prompt_episode = selected_ep
-        with sc2:
-            style_idx = STYLE_LIST.index(st.session_state.selected_style) \
-                if st.session_state.selected_style in STYLE_LIST else 0
-            active_style = st.selectbox(
-                "本次使用风格",
-                options=STYLE_LIST,
-                index=style_idx,
-                key="sp_style_selector",
-                help="风格前缀会在每条 prompt 开头自动注入"
-            )
-            if active_style != st.session_state.selected_style:
-                st.session_state.selected_style = active_style
-        with sc3:
-            st.write("")
-            st.write("")
-            rec_style = st.session_state.auto_recommended_style
-            if rec_style and rec_style != st.session_state.selected_style:
-                st.caption(f"💡 AI 推荐：**{rec_style}**")
-
-        st.markdown("---")
-
-        current_script = st.session_state.episodes.get(selected_ep)
-        current_prompts = st.session_state.scene_prompts.get(selected_ep, [])
-
-        if not current_prompts:
-            # 未生成：显示生成按钮
-            st.info(f"📭 第 {selected_ep} 集还没有生成 AI分镜 prompt")
-            gca, gcb = st.columns([1, 3])
-            with gca:
-                gen_btn = st.button(
-                    f"🚀 生成第 {selected_ep} 集 prompt",
-                    type="primary",
-                    use_container_width=True,
-                    key=f"sp_gen_{selected_ep}"
-                )
-            with gcb:
-                st.caption(f"使用风格：**{active_style}** | 剧本长度：{len(current_script):,} 字符")
-
-            if gen_btn:
-                gen_prompt = build_scene_prompt_generation(current_script, selected_ep)
-                with st.spinner(f"🎬 正在生成第 {selected_ep} 集分镜 prompt（{active_style} 风格）..."):
-                    container = st.empty()
-                    r = call_api_streaming(
-                        [{"role": "user", "content": gen_prompt}],
-                        system_prompt=SCENE_PROMPT_SYSTEM
-                    )
-                    if r:
-                        ai_output = stream_to_container(r, container)
-                        if ai_output:
-                            prompts = split_scene_prompts(ai_output)
-                            if not prompts:
-                                st.error("❌ 解析失败：AI 输出格式不符合预期")
-                                with st.expander("查看 AI 原始输出"):
-                                    st.text(ai_output)
-                            else:
-                                # 密度检查
-                                if len(prompts) > 22:
-                                    st.warning(f"⚠️ 生成 {len(prompts)} 条 prompt，超过建议上限（12-18 条）")
-                                elif len(prompts) > 18:
-                                    st.info(f"ℹ️ 生成 {len(prompts)} 条 prompt，略多于建议")
-                                elif len(prompts) < 10:
-                                    st.warning(f"⚠️ 仅生成 {len(prompts)} 条 prompt，可能切分不足")
-                                else:
-                                    st.success(f"✅ 生成 {len(prompts)} 条 prompt（理想范围）")
-
-                                st.session_state.scene_prompts[selected_ep] = prompts
-                                auto_save()
-                                time.sleep(1.0)
-                                st.rerun()
-        else:
-            # 已有：展示区
-            injected_prompts = inject_style_prefix(current_prompts, active_style)
-
-            # 状态栏
-            st1, st2, st3, st4 = st.columns(4)
-            st1.metric("Prompt 数", len(current_prompts))
-            total_chars = sum(len(p) for p in injected_prompts)
-            st2.metric("总字符", f"{total_chars:,}")
-            avg_chars = total_chars // len(current_prompts) if current_prompts else 0
-            st3.metric("平均长度", f"{avg_chars} 字")
-            st4.metric("当前风格", active_style)
-
-            if len(current_prompts) > 22:
-                st.error(f"⚠️ {len(current_prompts)} 条 prompt 超过 22 条，建议重新生成")
-
-            st.markdown("---")
-
-            # 操作按钮
-            op1, op2, op3 = st.columns(3)
-            with op1:
-                txt_content = export_prompts_txt(injected_prompts, active_style, selected_ep)
-                st.download_button(
-                    "📥 导出 TXT",
-                    data=txt_content.encode("utf-8"),
-                    file_name=f"第{selected_ep}集_AI分镜_{active_style}.txt",
-                    mime="text/plain",
-                    use_container_width=True,
-                    key=f"sp_dl_{selected_ep}"
-                )
-            with op2:
-                if st.button("🔄 重新生成全部", use_container_width=True, key=f"sp_regen_{selected_ep}"):
-                    st.session_state.scene_prompts.pop(selected_ep, None)
-                    auto_save()
-                    st.rerun()
-            with op3:
-                if st.button("🗑️ 清空本集", use_container_width=True, key=f"sp_clr_{selected_ep}"):
-                    st.session_state.scene_prompts.pop(selected_ep, None)
-                    auto_save()
-                    st.rerun()
-
-            st.markdown("---")
-            st.markdown(f"### 📋 第 {selected_ep} 集 · Prompt 序列（{active_style}）")
-            st.caption("💡 点击每条展开；可对单条重新生成或手动编辑")
-
-            for i, prompt_text in enumerate(injected_prompts):
-                char_count = len(prompt_text)
-                warn = " ⚠️ 超长" if char_count > 2000 else ""
-                with st.expander(f"**Prompt #{i+1:02d}** · {char_count} 字符{warn}", expanded=False):
-                    st.code(prompt_text, language=None)
-
-                    sca, scb = st.columns([1, 4])
-                    with sca:
-                        if st.button("🔄 重新生成", key=f"sp_rs_{selected_ep}_{i}", use_container_width=True):
-                            with st.spinner(f"重新生成第 {i+1} 条..."):
-                                original = current_prompts[i]
-                                regen_instr = build_single_prompt_regenerate(
-                                    original, current_script, i + 1, active_style
-                                )
-                                r = call_api_non_streaming(
-                                    [{"role": "user", "content": regen_instr}],
-                                    system_prompt=SCENE_PROMPT_SYSTEM
-                                )
-                                if r:
-                                    new_prompt = r.strip()
-                                    new_prompt = re.sub(r'^Prompt\s*#?\s*\d+\s*\n+', '', new_prompt)
-                                    st.session_state.scene_prompts[selected_ep][i] = new_prompt.strip()
-                                    auto_save()
-                                    st.success("✅ 已更新")
-                                    time.sleep(0.8)
-                                    st.rerun()
-
-                    with scb:
-                        edited = st.text_area(
-                            "手动编辑",
-                            value=current_prompts[i],
-                            key=f"sp_ed_{selected_ep}_{i}",
-                            height=120,
-                            label_visibility="collapsed"
-                        )
-                        if edited.strip() != current_prompts[i].strip() and edited.strip():
-                            if st.button("💾 保存编辑", key=f"sp_sv_{selected_ep}_{i}"):
-                                st.session_state.scene_prompts[selected_ep][i] = edited.strip()
-                                auto_save()
-                                st.success("已保存")
-                                time.sleep(0.5)
-                                st.rerun()
-
-with mt[5]:
     st.markdown("### 📊 总览")
     o1, o2, o3, o4 = st.columns(4)
     o1.metric("📚", len(st.session_state.chapter_order))
@@ -1889,33 +1496,6 @@ with mt[5]:
             st.markdown(f"""<div class="chapter-item"><div class="chapter-icon" style="background:linear-gradient(135deg,#3182ce,#2b6cb0);">{e}</div>
 <div class="chapter-info"><div class="chapter-name">第{e}集 <span class="tag tag-blue">{sh}镜</span> <span class="tag tag-green">~{sh * 12}s</span></div>
 <div class="chapter-meta">{len(s):,}字 · {"✅" if e in st.session_state.review_results else "⏳"}</div></div></div>""", unsafe_allow_html=True)
-
-    # === 新增：AI分镜进度 ===
-    st.markdown("---")
-    st.markdown("#### 🎞️ AI分镜 Prompt 进度")
-    scene_prompts = st.session_state.get("scene_prompts", {})
-    total_episodes = len(st.session_state.episodes)
-    if total_episodes == 0:
-        st.caption("还没有生成任何集的剧本")
-    else:
-        done_count = len([ep for ep, prompts in scene_prompts.items() if prompts])
-        st.progress(done_count / total_episodes if total_episodes > 0 else 0)
-        st.caption(
-            f"已完成 **{done_count} / {total_episodes}** 集的 AI分镜 prompt "
-            f"| 默认风格：**{st.session_state.get('selected_style', '温馨日常')}**"
-        )
-        if scene_prompts:
-            with st.expander("📋 各集 prompt 统计"):
-                for ep in sorted(scene_prompts.keys()):
-                    prompts = scene_prompts[ep]
-                    if prompts:
-                        total_chars = sum(len(p) for p in prompts)
-                        st.text(
-                            f"第 {ep} 集 · {len(prompts)} 条 · "
-                            f"总 {total_chars:,} 字符 · "
-                            f"平均 {total_chars // len(prompts)} 字/条"
-                        )
-
     st.markdown("---")
     st.markdown("#### 📌 记忆（可编辑）")
     for lb, ky in [("主线", "storyline"), ("人物", "characters"), ("进度", "progress"), ("结尾", "last_ending"), ("伏笔", "pending_foreshadow"), ("引爆", "next_foreshadow"), ("情绪", "emotion_track")]:
