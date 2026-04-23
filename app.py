@@ -943,29 +943,36 @@ if generate_btn and can_generate:
 
         full_export = full_export.strip()
 
+        # 定义函数：优先使用修订后版本，若无则使用原始版本
+        def get_final_content(idx, original_content):
+            if idx < len(st.session_state.review_results):
+                revised = st.session_state.review_results[idx].get("revised", "")
+                if revised:
+                    return revised
+            return original_content
+
+        screenplay_only = "\n\n".join(
+            "{}\n【{}】\n{}\n\n{}".format(
+                "=" * 60, r["title"], "=" * 60,
+                get_final_content(i, r["content"])
+            )
+            for i, r in enumerate(st.session_state.all_results)
+        )
+
         col_dl1, col_dl2 = st.columns(2)
         with col_dl1:
-            # 优先使用修订后版本，若无则使用原始版本
-def get_final_content(idx, original_content):
-    if idx < len(st.session_state.review_results):
-        revised = st.session_state.review_results[idx].get("revised", "")
-        if revised:
-            return revised
-    return original_content
-
-screenplay_only = "\n\n".join(
-    "{}\n【{}】\n{}\n\n{}".format(
-        "=" * 60, r["title"], "=" * 60,
-        get_final_content(i, r["content"])
-    )
-    for i, r in enumerate(st.session_state.all_results)
-) 
-                for i, r in enumerate(st.session_state.all_results)
-             )
             st.download_button(
                 label="⬇️  下载剧本（仅正文）",
                 data=screenplay_only.encode("utf-8"),
                 file_name="screenplay.txt",
+                mime="text/plain",
+                use_container_width=True,
+            )
+        with col_dl2:
+            st.download_button(
+                label="⬇️  下载完整报告（剧本 + 自检）",
+                data=full_export.encode("utf-8"),
+                file_name="screenplay_with_review.txt",
                 mime="text/plain",
                 use_container_width=True,
             )
