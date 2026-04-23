@@ -958,7 +958,7 @@ if generate_btn and can_generate:
                 get_final_content(i, r["content"])
                ) 
                 for i, r in enumerate(st.session_state.all_results)
-            )
+             )
             st.download_button(
                 label="⬇️  下载剧本（仅正文）",
                 data=screenplay_only.encode("utf-8"),
