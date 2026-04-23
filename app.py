@@ -949,7 +949,7 @@ if generate_btn and can_generate:
             def get_final_content(idx, original_content):
                if idx < len(st.session_state.review_results):
                    revised = st.session_state.review_results[idx].get("revised", "")
-                if revised:
+                   if revised:
                         return revised
                return original_content
                         
