@@ -946,17 +946,20 @@ if generate_btn and can_generate:
         col_dl1, col_dl2 = st.columns(2)
         with col_dl1:
             # 优先使用修订后版本，若无则使用原始版本
-            def get_final_content(idx, original_content):
-               if idx < len(st.session_state.review_results):
-                   revised = st.session_state.review_results[idx].get("revised", "")
-                   if revised:
-                        return revised
-               return original_content
-                        
-            screenplay_only = "\n\n".join(
-                "{}\n【{}】\n{}\n\n{}".format("=" * 60, r["title"], "=" * 60, r["content"])
-                get_final_content(i, r["content"])
-               ) 
+def get_final_content(idx, original_content):
+    if idx < len(st.session_state.review_results):
+        revised = st.session_state.review_results[idx].get("revised", "")
+        if revised:
+            return revised
+    return original_content
+
+screenplay_only = "\n\n".join(
+    "{}\n【{}】\n{}\n\n{}".format(
+        "=" * 60, r["title"], "=" * 60,
+        get_final_content(i, r["content"])
+    )
+    for i, r in enumerate(st.session_state.all_results)
+) 
                 for i, r in enumerate(st.session_state.all_results)
              )
             st.download_button(
