@@ -526,19 +526,6 @@ def call_api_stream(messages: list, api_key: str, api_base: str, model: str):
 # 模型列表
 # ─────────────────────────────────────────────
 PRESET_MODELS = [
-    "gpt-4o",
-    "gpt-4o-mini",
-    "gpt-4.1",
-    "gpt-4.1-mini",
-    "gpt-4-turbo",
-    "claude-opus-4-5",
-    "claude-sonnet-4-5",
-    "claude-3-7-sonnet-20250219",
-    "claude-3-5-haiku-20241022",
-    "gemini-2.0-flash",
-    "gemini-1.5-pro",
-    "deepseek-chat",
-    "deepseek-reasoner",
     "自定义模型...",
 ]
 
