@@ -1824,11 +1824,11 @@ elif st.session_state.all_results and not st.session_state.generating:
 
 # ── 底部说明 ─────────────────────────────────
 st.markdown('<hr class="divider">', unsafe_allow_html=True)
-st.markdown(
+footer_html = (
     '<div class="info-box" style="text-align:center; font-size:0.8rem;">'
     'API Key 仅用于本次请求，不会被记录。&nbsp;|&nbsp;'
     '自动识别章节标题分块，无标题则每 2000 字切一块。&nbsp;|&nbsp;'
     '每章完成后自动提取衔接摘要，确保跨章剧情连贯。'
-    '</div>',
-    unsafe_allow_html=True,
+    '</div>'
 )
+st.markdown(footer_html, unsafe_allow_html=True)
