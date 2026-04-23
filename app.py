@@ -324,20 +324,19 @@ with st.sidebar:
         label_visibility="collapsed"
     )
 
-    if model_choice == "自定义输入":
-    model_id = st.text_input(
-        "自定义 Model ID",
-        placeholder="例如：gpt-4o-2024-11-20",
-    )
-    # 防止 None 或空字符串传入后续逻辑
-    model_id = (model_id or "").strip()
-    if model_id:
-        st.caption(f"当前模型：`{model_id}`")
+     if model_choice == "自定义输入":
+        model_id = st.text_input(
+            "自定义 Model ID",
+            placeholder="例如：gpt-4o-2024-11-20",
+        )
+        model_id = (model_id or "").strip()
+        if model_id:
+            st.caption(f"当前模型：`{model_id}`")
+        else:
+            st.warning("请输入自定义 Model ID")
     else:
-        st.warning("请输入自定义 Model ID")
-else:
-    model_id = model_choice or ""
-    st.caption(f"当前模型：`{model_id}`")
+        model_id = model_choice or ""
+        st.caption(f"当前模型：`{model_id}`")
 
     st.markdown("---")
     st.markdown("##### 关于本工具")
