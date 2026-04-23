@@ -324,7 +324,7 @@ with st.sidebar:
         label_visibility="collapsed"
     )
 
-     if model_choice == "自定义输入":
+      if model_choice == "自定义输入":
         model_id = st.text_input(
             "自定义 Model ID",
             placeholder="例如：gpt-4o-2024-11-20",
