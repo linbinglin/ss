@@ -3,7 +3,6 @@ import requests
 import json
 import time
 
-# ==================== 页面配置 ====================
 st.set_page_config(
     page_title="短剧剧本生成器",
     page_icon="🎬",
@@ -11,7 +10,6 @@ st.set_page_config(
     initial_sidebar_state="expanded"
 )
 
-# ==================== 全局样式 ====================
 st.markdown("""
 <style>
     .main-title {
@@ -24,14 +22,6 @@ st.markdown("""
         font-size: 0.95rem;
         color: #666;
         margin-bottom: 2rem;
-    }
-    .section-label {
-        font-size: 0.85rem;
-        font-weight: 600;
-        color: #444;
-        margin-bottom: 0.4rem;
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
     }
     .output-box {
         background: #f8f8f8;
@@ -54,31 +44,10 @@ st.markdown("""
         border-radius: 4px;
         width: 100%;
         cursor: pointer;
-        transition: background 0.2s;
-    }
-    .stButton > button:hover {
-        background-color: #333;
-    }
-    .info-badge {
-        display: inline-block;
-        background: #eef;
-        color: #336;
-        font-size: 0.78rem;
-        padding: 2px 8px;
-        border-radius: 10px;
-        margin-right: 6px;
-    }
-    div[data-testid="stTextArea"] textarea {
-        font-size: 0.9rem;
-        line-height: 1.6;
-    }
-    .stProgress > div > div {
-        background-color: #1a1a1a;
     }
 </style>
 """, unsafe_allow_html=True)
 
-# ==================== 系统提示词（完整指令） ====================
 SYSTEM_PROMPT = """你是"短剧改编编剧"，任务是把输入小说改编为可拍摄、节奏有效、人物鲜明的短剧剧本。
 
 ====================
@@ -100,10 +69,8 @@ P4. 节奏与情绪张力
 P5. 文采修饰
 
 ====================
-三、你必须理解的"影视化优化"
+三、影视化优化规则
 ====================
-影视化优化不是"多写"也不是"少写"，而是"有效转化"：
-
 A. 可拍转化
 - 心理描写 → 动作/表情/停顿/视线/内心OS/手部反应
 - 设定信息 → 场景细节或人物互动中自然带出
@@ -114,77 +81,47 @@ B. 互动转化
 - 任一关键动作后，要有他人反应或关系变化反馈
 
 C. 推进转化
-- 每段内容必须至少完成一个功能：推剧情 / 推关系 / 推人物性格 / 推悬念
+- 每段内容必须至少完成一个功能：推剧情/推关系/推人物性格/推悬念
 - 纯重复、纯回锅、纯解释同一信息 → 删
 
 ====================
-四、对白规则（高优先）
+四、对白规则
 ====================
 1) 对白先服务逻辑，再服务风格。
-2) 问与答必须有逻辑对应，允许：正面回答 / 回避（但要显示回避意图）/ 反问（但要推动冲突）/ 打断（但要带来新方向）
-3) 角色"说什么"不能脱离原著信息边界。
-4) 角色"怎么说"体现性格差异（语气、节奏、措辞、攻击方式）。
-5) 禁止把同一句"模板腔"分配给所有角色。
+2) 问与答必须有逻辑对应。
+3) 角色说什么不能脱离原著信息边界。
+4) 角色怎么说体现性格差异。
+5) 禁止把同一句模板腔分配给所有角色。
 
 ====================
-五、人物存在感规则（防工具人）
+五、人物存在感规则
 ====================
-1) 关键角色每次出场都要有"可识别行为"或"可识别表达"。
-2) 不能说话的角色可用内心OS，作用是补充角色立场。
-3) 任何角色连续长时间仅"站着看"且无功能 → 判定为工具人，必须改写互动。
+1) 关键角色每次出场都要有可识别行为或可识别表达。
+2) 不能说话的角色可用内心OS补充角色立场。
+3) 任何角色连续长时间仅站着看且无功能 → 必须改写互动。
 
 ====================
-六、场景与输出格式（严格执行）
+六、输出格式（严格执行）
 ====================
-输出时仅使用以下形式：
-
 【场景：地点｜时间（白天/夜晚）】
-正文段落...
 正文段落...
 
 规则：
-1) 只有"场景变化"时才写新的【场景】头。
-2) 同一场景内连续描述，不重复场景头。
-3) 每个自然段都必须是一个完整"可拍单元"（有动作/对白/结果中的至少两项）。
-4) 描述简洁但具体，避免空泛形容词堆砌。
-5) 不使用"像……""宛如……"等比喻词。
+1) 只有场景变化时才写新的场景头。
+2) 每个自然段都必须是一个完整可拍单元（有动作/对白/结果中的至少两项）。
+3) 描述简洁但具体，避免空泛形容词堆砌。
+4) 不使用像……宛如……等比喻词。
 
 ====================
-七、输出结尾必须附加简报
+七、结尾必须附加简报
 ====================
-在剧本末尾附加：
 - 原著保真：列出未改动的关键事件点
 - 影视化优化：列出本次做的3-5个有效优化点
 - 逻辑保障：列出3处关键问答或衔接如何成立
 
 ====================
-参考示例（必须参考此格式与处理方式）
+参考示例（必须参考此格式）
 ====================
-
-【输入示例 - 原著片段】
-林初雪站在拍卖会场中央，心跳如擂鼓。她知道，今天这场拍卖会将决定她的命运。她的手心全是汗，紧张得几乎无法呼吸。她告诉自己要冷静，要冷静，但心跳声却越来越响，仿佛要跳出胸腔。
-"各位贵宾，接下来这件拍品非同寻常。"拍卖师故作神秘地说，"这是一枚千年寒玉，传说中能够觉醒灵力的至宝！"
-林初雪的瞳孔骤然收缩。千年寒玉？那不正是她母亲临终前托付给她的东西吗？她明明藏得很好，怎么会出现在这里？她的心一下子提到了嗓子眼，脑子里一片混乱。
-"一百万！"台下有人出价。
-"两百万！"又有人喊价。
-林初雪咬紧嘴唇，她知道自己必须拿回那枚寒玉，那是母亲的遗物，也是她唯一的希望。可是她身上只有五十万，根本不够。她该怎么办？她感到绝望，深深的绝望。
-就在这时，包厢里传来一个慵懒的男声："一千万。"
-全场哗然。林初雪抬头看向二楼包厢，透过薄纱帘幕，她隐约看到一个修长的身影。那个人是谁？为什么要出这么高的价格？她心里充满了疑惑。
-"一千万一次，一千万两次——"拍卖师举起木槌。
-林初雪再也忍不住了，她冲上前大喊："等等！那是我的东西！"
-拍卖师愣住了，台下的宾客也都愣住了。
-"小姐，拍卖会有拍卖会的规矩。"拍卖师皮笑肉不笑地说，"你说是你的，有证据吗？"
-"我……"林初雪语塞。她确实没有证据。
-就在这时，二楼包厢的门打开了。一个穿着黑色长袍的男人缓缓走出来，他居高临下地看着林初雪，嘴角勾起一抹玩味的笑容。
-"有意思。"他开口道，"既然这位小姐说寒玉是她的，不如让她证明一下？"
-林初雪握紧拳头，深吸一口气，闭上眼睛，开始调动体内沉睡已久的灵力。
-突然，展台上的寒玉开始发光！淡蓝色的光芒越来越亮，整个拍卖厅都被照得如同白昼。所有人都震惊了。
-"这……这怎么可能？"拍卖师结结巴巴地说。
-黑袍男人的眼神变了，从玩味变成了认真。他盯着林初雪，没想到这个普通的女孩竟然真的能引发寒玉共鸣。
-"看来，"黑袍男人缓缓开口，"这位小姐确实与寒玉有缘。不过，既然寒玉已经流入拍卖会，就该按规矩来。我出一千万，小姐若是拿不出更高的价格，那寒玉就归我了。"
-林初雪的心沉到了谷底。她拿不出一千万。她咬着牙，眼眶发红。
-
-【输出示例 - 剧本】
 
 【场景：拍卖会场｜夜晚】
 拍卖师掀开红布。展台上的寒玉在射灯下泛着青白色。
@@ -201,8 +138,6 @@ C. 推进转化
 【场景：拍卖会场｜夜晚】
 叫价声停住。
 前排举牌的男人把号牌放下，转头看向二楼。
-左侧两名女宾客凑近低声说话。
-后排有人举起手机对准包厢方向。
 拍卖师握槌的手停在半空。
 林初雪抬头盯着二楼纱帘，呼吸加快。
 拍卖师回过神，举槌："一千万一次——"
@@ -211,7 +146,6 @@ C. 推进转化
 林初雪深吸一口气："这块玉是我母亲的遗物。"
 拍卖师脸色一冷："小姐，拍卖会讲证据。你拿什么证明？"
 林初雪把支票拍在台面上："我先不加价，我先证明它认我。"
-拍卖师看向二楼，没接话。
 
 【场景：拍卖会场二楼栏边｜夜晚】
 包厢门打开，黑袍男人走到栏杆边，双手撑在栏杆上俯视她："可以。你证明。"
@@ -221,10 +155,8 @@ C. 推进转化
 她的呼吸放慢，手掌下的玻璃表面开始起雾。
 雾气蔓延到展台四角，边缘凝出白霜。
 寒玉内部亮起淡蓝光，一层层增强。
-吊灯下方飘出白色雾气，前排酒杯表面结出细小冰晶。
 前排宾客往后退，椅子拖动声响成一片。
 拍卖师手一松，木槌掉在地上。
-后排有人举着手机连拍。
 林初雪睁眼，脸色发白，额头全是汗。她手撑着台面才站稳，抬头看向二楼："够不够？"
 
 【场景：拍卖会场二楼栏边｜夜晚】
@@ -236,38 +168,44 @@ C. 推进转化
 拍卖师低头看一眼，抬起头："五十万。"
 台下有人笑出声，有人摇头。
 林初雪抬头盯住二楼黑袍男人，声音发紧："你到底想要什么？"
-黑袍男人转身往包厢里走，停在门口侧过头："明晚子时，城北废宅。你一个人来，寒玉的事继续谈。"
-他推开门："迟到作废。"
+黑袍男人转身往包厢里走，停在门口侧过头："明晚子时，城北废宅。你一个人来，寒玉的事继续谈。迟到作废。"
 包厢门合上。
 林初雪把支票收回袖子里，转身离开展台。
-保安让开一条路，宾客们盯着她背影议论。
 
 -----------------------------
 【剧本简报】
-原著保真：拍卖会见到母亲遗物寒玉、无力竞拍、神秘男人出天价压场、被迫当场证明认主、灵力觉醒引发异象、对方以规则压制并抛出下一步约见条件。
-影视化优化：心理描写改为手部动作（攥支票/指节发白/翻看数字/咬唇）；灵力觉醒具象化为起雾→结霜→发光→环境结冰的递进视觉链；群体反应拆解为个体可拍动作；删除所有重复心理独白；用支票金额被公开读出触发台下笑声替代"绝望"旁白。
-逻辑保障："你有证据"→"我先证明"形成挑战-应战；"够不够"→"认主成立"给出判定结果；"五十万"被读出→台下笑声形成群体反馈；"你想要什么"→"明晚城北废宅"抛出明确后续行动钩子。
+原著保真：拍卖会见到母亲遗物寒玉、无力竞拍、神秘男人出天价压场、被迫当场证明认主、灵力觉醒引发异象、对方以规则压制并抛出约见条件。
+影视化优化：心理描写改为手部动作；灵力觉醒具象化为起雾→结霜→发光递进视觉链；群体反应拆解为个体可拍动作；删除所有重复心理独白。
+逻辑保障："你有证据"→"我先证明"形成挑战-应战；"够不够"→"认主成立"给出判定；"五十万被读出"→台下笑声形成群体反馈。
 
-====================
 现在请按照以上规则和示例，将用户提供的小说原文改编为短剧剧本。
 """
 
-# ==================== 预设模型列表 ====================
 PRESET_MODELS = [
-    "claude-opus-4-7",
-    "gemini-3.1-pro-preview",
+    "gpt-4o",
+    "gpt-4o-mini",
+    "gpt-4-turbo",
+    "gpt-3.5-turbo",
+    "claude-3-5-sonnet-20241022",
+    "claude-3-5-haiku-20241022",
+    "claude-3-opus-20240229",
+    "gemini-1.5-pro",
+    "gemini-1.5-flash",
+    "deepseek-chat",
+    "deepseek-reasoner",
+    "qwen-plus",
+    "qwen-turbo",
     "自定义输入",
 ]
 
-# ==================== API 调用函数 ====================
-def call_api(api_key: str, base_url: str, model: str, user_content: str):
-    """调用 OpenAI 兼容接口，返回生成文本（流式）。"""
+
+def call_api(api_key, base_url, model, user_content):
     headers = {
         "Authorization": f"Bearer {api_key}",
         "Content-Type": "application/json",
     }
     payload = {
-        "model": str(model) if model else "gpt-4o",
+        "model": model,
         "messages": [
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": f"请将以下小说原文改编为短剧剧本：\n\n{user_content}"},
@@ -276,9 +214,7 @@ def call_api(api_key: str, base_url: str, model: str, user_content: str):
         "temperature": 0.7,
         "max_tokens": 8192,
     }
-
     url = base_url.rstrip("/") + "/chat/completions"
-
     with requests.post(url, headers=headers, json=payload, stream=True, timeout=120) as resp:
         resp.raise_for_status()
         for line in resp.iter_lines():
@@ -298,7 +234,7 @@ def call_api(api_key: str, base_url: str, model: str, user_content: str):
                 continue
 
 
-# ==================== 侧边栏：API 配置 ====================
+# 侧边栏
 with st.sidebar:
     st.markdown("## ⚙️ API 配置")
     st.markdown("---")
@@ -317,6 +253,7 @@ with st.sidebar:
     )
 
     st.markdown("##### Model ID")
+
     model_choice = st.selectbox(
         "选择模型",
         options=PRESET_MODELS,
@@ -324,18 +261,18 @@ with st.sidebar:
         label_visibility="collapsed"
     )
 
-      if model_choice == "自定义输入":
-        model_id = st.text_input(
+    if model_choice == "自定义输入":
+        custom_model = st.text_input(
             "自定义 Model ID",
             placeholder="例如：gpt-4o-2024-11-20",
         )
-        model_id = (model_id or "").strip()
+        model_id = custom_model.strip() if custom_model else ""
         if model_id:
             st.caption(f"当前模型：`{model_id}`")
         else:
             st.warning("请输入自定义 Model ID")
     else:
-        model_id = model_choice or ""
+        model_id = model_choice
         st.caption(f"当前模型：`{model_id}`")
 
     st.markdown("---")
@@ -343,11 +280,10 @@ with st.sidebar:
     st.caption("本工具将小说原文按照专业短剧编剧规则自动转化为可拍摄剧本，适配任何 OpenAI 兼容接口。")
 
 
-# ==================== 主界面 ====================
+# 主界面
 st.markdown('<div class="main-title">🎬 短剧剧本生成器</div>', unsafe_allow_html=True)
 st.markdown('<div class="sub-title">将小说原文一键转化为可拍摄的短剧剧本</div>', unsafe_allow_html=True)
 
-# ---- 输入方式选择 ----
 input_method = st.radio(
     "选择输入方式",
     options=["📋 粘贴文本", "📁 上传文件"],
@@ -364,13 +300,12 @@ if input_method == "📋 粘贴文本":
         placeholder="请在此处粘贴小说原文内容……\n\n支持任意长度，建议单次处理 500～3000 字以获得最佳效果。",
         label_visibility="collapsed"
     )
-
 else:
     uploaded_file = st.file_uploader(
         "上传 TXT 文件",
         type=["txt"],
         label_visibility="collapsed",
-        help="仅支持 .txt 格式，编码为 UTF-8"
+        help="仅支持 .txt 格式"
     )
     if uploaded_file is not None:
         try:
@@ -384,9 +319,8 @@ else:
                 novel_text = uploaded_file.read().decode("gbk")
                 st.success(f"✅ 文件读取成功（GBK 编码），共 {len(novel_text)} 字")
             except Exception as e:
-                st.error(f"文件解码失败，请确认文件为 UTF-8 或 GBK 编码的 TXT 文件。错误：{e}")
+                st.error(f"文件解码失败：{e}")
 
-# ---- 字数提示 ----
 if novel_text:
     char_count = len(novel_text.strip())
     col1, col2, col3 = st.columns(3)
@@ -399,17 +333,14 @@ if novel_text:
 
 st.markdown("---")
 
-# ---- 生成按钮 ----
 generate_btn = st.button("🚀 开始生成剧本", use_container_width=True)
 
-# ==================== 生成逻辑 ====================
 if generate_btn:
-    # 校验输入
     if not api_key.strip():
         st.error("⚠️ 请在左侧侧边栏填写 API Key。")
         st.stop()
 
-    if not model_id or not model_id.strip():
+    if not model_id:
         st.error("⚠️ 请选择或输入 Model ID。")
         st.stop()
 
@@ -417,10 +348,6 @@ if generate_btn:
         st.error("⚠️ 请先输入或上传小说原文内容。")
         st.stop()
 
-    if len(novel_text.strip()) < 50:
-        st.warning("⚠️ 内容过短，建议提供至少 50 字的原文以获得有效剧本输出。")
-
-    # 进度条与状态
     progress_bar = st.progress(0, text="正在连接 API……")
     status_placeholder = st.empty()
     output_placeholder = st.empty()
@@ -445,7 +372,6 @@ if generate_btn:
             full_output += chunk_text
             token_count += len(chunk_text)
 
-            # 动态更新进度条
             estimated_progress = min(35 + int(token_count / 50), 90)
             stage = "正在生成对白与场景描述……"
             if token_count > 1000:
@@ -454,7 +380,6 @@ if generate_btn:
                 stage = "正在生成剧本简报……"
             progress_bar.progress(estimated_progress, text=stage)
 
-            # 实时输出
             output_placeholder.markdown(
                 f'<div class="output-box">{full_output}</div>',
                 unsafe_allow_html=True
@@ -464,7 +389,6 @@ if generate_btn:
         progress_bar.progress(100, text=f"✅ 生成完成！用时 {elapsed} 秒")
         status_placeholder.success(f"剧本生成完毕，共输出 {len(full_output):,} 字，用时 {elapsed} 秒。")
 
-        # 下载按钮
         st.download_button(
             label="⬇️ 下载剧本（TXT）",
             data=full_output.encode("utf-8"),
@@ -475,12 +399,12 @@ if generate_btn:
 
     except requests.exceptions.ConnectionError:
         progress_bar.empty()
-        st.error("❌ 无法连接到接口地址，请检查 Base URL 是否正确，或网络是否正常。")
+        st.error("❌ 无法连接到接口地址，请检查 Base URL 是否正确。")
     except requests.exceptions.HTTPError as e:
         progress_bar.empty()
         status_code = e.response.status_code if e.response else "未知"
         if status_code == 401:
-            st.error("❌ API Key 无效或已过期，请检查后重试。")
+            st.error("❌ API Key 无效或已过期。")
         elif status_code == 429:
             st.error("❌ 请求频率超限，请稍后重试。")
         elif status_code == 404:
@@ -489,7 +413,7 @@ if generate_btn:
             st.error(f"❌ 接口返回错误 {status_code}：{e}")
     except requests.exceptions.Timeout:
         progress_bar.empty()
-        st.error("❌ 请求超时（120秒），建议缩短原文长度后重试，或检查网络连接。")
+        st.error("❌ 请求超时（120秒），建议缩短原文长度后重试。")
     except Exception as e:
         progress_bar.empty()
         st.error(f"❌ 发生未知错误：{e}")
