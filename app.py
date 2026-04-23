@@ -368,36 +368,39 @@ REVIEW_PROMPT = """你是一个由三位专业人士组成的剧本审核团队�
 # ─────────────────────────────────────────────
 def split_into_chapters(text: str) -> list:
     chapter_title_re = re.compile(
-        r'(?m)^(第\s*\d+\s*[章回节集部][^\n]*'
-        r'|第\s*[零一二三四五六七八九十百千]+\s*[章回节集部][^\n]*'
-        r'|Chapter\s*\d+[^\n]*'
-        r'|CHAPTER\s*\d+[^\n]*)$',
+        r'(?m)^(第\s*[\d零一二三四五六七八九十百千]+\s*[章回节集部][^\n]{0,30})$',
         re.IGNORECASE
     )
 
-    parts = chapter_title_re.split(text)
-    titles = chapter_title_re.findall(text)
+    positions = []
+    for m in chapter_title_re.finditer(text):
+        positions.append((m.start(), m.end(), m.group(1).strip()))
+
     chapters = []
 
-    if len(titles) >= 1:
-        if parts[0].strip():
+    if len(positions) >= 1:
+        # 章节标题前如果有内容，作为序章
+        pre_content = text[:positions[0][0]].strip()
+        if pre_content:
             chapters.append({
                 "title": "序章 / 前言",
-                "content": parts[0].strip(),
+                "content": pre_content,
                 "index": 0
             })
-        for i, title in enumerate(titles):
-            content = parts[i + 1].strip() if i + 1 < len(parts) else ""
+
+        for i, (start, end, title) in enumerate(positions):
+            # 正文从标题行结束到下一个标题开始
+            content_start = end
+            content_end = positions[i + 1][0] if i + 1 < len(positions) else len(text)
+            content = text[content_start:content_end].strip()
             if content:
                 chapters.append({
-                    "title": title.strip(),
+                    "title": title,
                     "content": content,
                     "index": len(chapters)
                 })
-            else:
-                # 标题存在但内容为空，说明内容被合并到下一块，跳过空标题
-                pass
     else:
+        # 没有识别到章节标题，按2000字分块
         chunk_size = 2000
         total_len = len(text)
         chunk_index = 0
@@ -418,9 +421,6 @@ def split_into_chapters(text: str) -> list:
                 chunk_index += 1
             pos = end
 
-    # 过滤掉内容少于10字符的章节（纯标题行误识别）
-    chapters = [ch for ch in chapters if len(ch["content"]) >= 10]
-    
     # 重新编排index
     for i, ch in enumerate(chapters):
         ch["index"] = i
