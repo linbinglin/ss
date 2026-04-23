@@ -91,7 +91,7 @@ PRESET_MODELS = [
     "deepseek-reasoner",
     "qwen-plus",
     "qwen-turbo",
-    "custom",
+    "自定义输入",
 ]
 
 
@@ -159,9 +159,9 @@ with st.sidebar:
         index=0,
     )
 
-    if model_choice == "custom":
+    if model_choice == "自定义输入":
         custom_input = st.text_input(
-            "Custom Model ID",
+            "自定义 Model ID",
             value="",
             placeholder="e.g. claude-opus-4-7",
         )
