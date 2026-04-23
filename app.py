@@ -254,19 +254,8 @@ C. 推进转化
 
 # ==================== 预设模型列表 ====================
 PRESET_MODELS = [
-    "gpt-4o",
-    "gpt-4o-mini",
-    "gpt-4-turbo",
-    "gpt-3.5-turbo",
-    "claude-3-5-sonnet-20241022",
-    "claude-3-5-haiku-20241022",
-    "claude-3-opus-20240229",
-    "gemini-1.5-pro",
-    "gemini-1.5-flash",
-    "deepseek-chat",
-    "deepseek-reasoner",
-    "qwen-plus",
-    "qwen-turbo",
+    "claude-opus-4-7",
+    "gemini-3.1-pro-preview",
     "自定义输入",
 ]
 
@@ -278,7 +267,7 @@ def call_api(api_key: str, base_url: str, model: str, user_content: str):
         "Content-Type": "application/json",
     }
     payload = {
-        "model": model,
+        "model": str(model) if model else "gpt-4o",
         "messages": [
             {"role": "system", "content": SYSTEM_PROMPT},
             {"role": "user", "content": f"请将以下小说原文改编为短剧剧本：\n\n{user_content}"},
@@ -336,13 +325,19 @@ with st.sidebar:
     )
 
     if model_choice == "自定义输入":
-        model_id = st.text_input(
-            "自定义 Model ID",
-            placeholder="例如：gpt-4o-2024-11-20",
-        )
-    else:
-        model_id = model_choice
+    model_id = st.text_input(
+        "自定义 Model ID",
+        placeholder="例如：gpt-4o-2024-11-20",
+    )
+    # 防止 None 或空字符串传入后续逻辑
+    model_id = (model_id or "").strip()
+    if model_id:
         st.caption(f"当前模型：`{model_id}`")
+    else:
+        st.warning("请输入自定义 Model ID")
+else:
+    model_id = model_choice or ""
+    st.caption(f"当前模型：`{model_id}`")
 
     st.markdown("---")
     st.markdown("##### 关于本工具")
