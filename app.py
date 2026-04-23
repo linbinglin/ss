@@ -1262,3 +1262,691 @@ with s2b:
     elif st.session_state.global_analysis:
         with st.expander("📋 查看提炼结果", expanded=False):
             st.markdown(st.session_state.global_analysis)
+# ============================================================
+# 步骤三：角色驱动卡管理
+# ============================================================
+st.markdown("""
+<div class="card">
+    <div class="card-header">
+        <span class="card-icon">👥</span>
+        <span class="card-title">步骤三：角色驱动卡</span>
+        <span class="card-subtitle">设定主角 · 锁定性格 · 更新状态</span>
+    </div>
+</div>""", unsafe_allow_html=True)
+
+cards = st.session_state.character_cards
+
+# 顶部操作栏
+cc1, cc2, cc3 = st.columns([2, 2, 2])
+with cc1:
+    if st.button("➕ 新增角色卡", key="add_card", use_container_width=True):
+        new_card = make_empty_card()
+        st.session_state.character_cards.append(new_card)
+        auto_save()
+        st.rerun()
+with cc2:
+    if st.session_state.global_analysis:
+        if st.button("📥 从提炼结果重新导入", key="reimport_cards", use_container_width=True):
+            parsed = parse_cards_from_analysis(st.session_state.global_analysis)
+            if parsed:
+                locked = [c for c in st.session_state.character_cards if c.get("locked_all")]
+                locked_names = {c["name"] for c in locked}
+                new_c = [c for c in parsed if c["name"] not in locked_names]
+                st.session_state.character_cards = locked + new_c
+                auto_save()
+                st.success(f"✅ 导入 {len(new_c)} 个角色卡")
+                st.rerun()
+            else:
+                st.warning("未能从提炼结果中解析到驱动卡，请检查提炼结果格式")
+with cc3:
+    protagonist = get_protagonist()
+    if protagonist:
+        st.markdown(f"""
+        <div style="background:#fffaf0;border:1px solid #f6ad55;border-radius:8px;
+                    padding:8px 12px;font-size:0.82rem;text-align:center;">
+            👑 主角：<b>{protagonist['name']}</b>（{protagonist['gender']}）
+        </div>""", unsafe_allow_html=True)
+    else:
+        st.markdown("""
+        <div style="background:#fff5f5;border:1px solid #fc8181;border-radius:8px;
+                    padding:8px 12px;font-size:0.72rem;text-align:center;color:#c53030;">
+            ⚠️ 尚未设定主角，请在下方角色卡中设置
+        </div>""", unsafe_allow_html=True)
+
+if not cards:
+    st.markdown("""
+    <div class="empty-state">
+        <div class="empty-icon">👥</div>
+        <div class="empty-text">暂无角色驱动卡</div>
+        <div style="font-size:0.78rem;color:#cbd5e0;">完成全局提炼后自动生成，或点击"新增角色卡"手动添加</div>
+    </div>""", unsafe_allow_html=True)
+else:
+    # 主角排在最前面
+    protagonist_idx = st.session_state.protagonist_index
+    ordered_indices = []
+    if 0 <= protagonist_idx < len(cards):
+        ordered_indices.append(protagonist_idx)
+    for i in range(len(cards)):
+        if i != protagonist_idx:
+            ordered_indices.append(i)
+
+    for display_order, real_idx in enumerate(ordered_indices):
+        card = cards[real_idx]
+        is_protagonist = (real_idx == st.session_state.protagonist_index)
+        is_locked = card.get("locked_all", False)
+        is_perm_locked = card.get("locked_permanent", False)
+
+        # 卡片样式
+        card_class = "char-card"
+        if is_protagonist:
+            card_class += " protagonist"
+        elif is_locked:
+            card_class += " locked"
+
+        # 徽章
+        badges = []
+        if is_protagonist:
+            badges.append('<span class="tag tag-gold">👑 主角</span>')
+        if is_locked:
+            badges.append('<span class="tag tag-green">🔒 已锁定</span>')
+        elif is_perm_locked:
+            badges.append('<span class="tag tag-green">🔒 性格已锁</span>')
+        if card.get("current_body_state"):
+            badges.append(f'<span class="tag tag-blue">状态已设</span>')
+
+        badge_html = " ".join(badges)
+        name_display = card.get("name") or f"角色 {real_idx+1}"
+
+        st.markdown(f"""
+        <div class="{card_class}">
+            <div class="char-card-header">
+                <span class="char-name">{name_display}</span>
+                <div class="char-badges">{badge_html}</div>
+            </div>
+        </div>""", unsafe_allow_html=True)
+
+        with st.expander(f"{'👑 ' if is_protagonist else ''}编辑 {name_display}", expanded=card.get("expanded", False)):
+
+            # 基础信息行
+            bi1, bi2, bi3 = st.columns([3, 2, 2])
+            with bi1:
+                new_name = st.text_input("角色名", value=card.get("name", ""),
+                                          key=f"cname_{real_idx}", placeholder="角色姓名")
+                if new_name != card.get("name", ""):
+                    cards[real_idx]["name"] = new_name
+                    auto_save()
+            with bi2:
+                gender_opts = ["女", "男", "其他"]
+                cur_gender = card.get("gender", "女")
+                gender_idx = gender_opts.index(cur_gender) if cur_gender in gender_opts else 0
+                new_gender = st.selectbox("性别", gender_opts, index=gender_idx, key=f"cgender_{real_idx}")
+                if new_gender != card.get("gender"):
+                    cards[real_idx]["gender"] = new_gender
+                    auto_save()
+            with bi3:
+                role_opts = ["主要角色", "核心配角", "次要角色", "功能角色"]
+                cur_role = card.get("role_type", "主要角色")
+                role_idx = role_opts.index(cur_role) if cur_role in role_opts else 0
+                new_role = st.selectbox("角色类型", role_opts, index=role_idx, key=f"crole_{real_idx}")
+                if new_role != card.get("role_type"):
+                    cards[real_idx]["role_type"] = new_role
+                    auto_save()
+
+            st.markdown("---")
+
+            # ── 永久锁定区（性格核心）──
+            perm_locked = card.get("locked_permanent", False)
+            perm_color = "#f0fff4" if perm_locked else "#fafafa"
+            lock_icon = "🔒" if perm_locked else "🔓"
+
+            st.markdown(f"""
+            <div style="background:{perm_color};border:1px solid #e2e8f0;border-radius:8px;
+                        padding:10px 12px;margin-bottom:8px;">
+                <div style="font-size:0.78rem;font-weight:600;color:#4a5568;margin-bottom:6px;">
+                    {lock_icon} 性格核心（锁定后跨集复用，不重新生成）
+                </div>
+            </div>""", unsafe_allow_html=True)
+
+            disabled_perm = perm_locked
+
+            new_cp = st.text_area(
+                "核心人格（一句话定义）",
+                value=card.get("core_personality", ""),
+                height=60, key=f"ccp_{real_idx}",
+                disabled=disabled_perm,
+                placeholder="示例：表面冷漠实则刀子嘴豆腐心的前特种兵，把保护他人当成赎罪"
+            )
+            if not disabled_perm and new_cp != card.get("core_personality", ""):
+                cards[real_idx]["core_personality"] = new_cp
+                auto_save()
+
+            new_sd = st.text_area(
+                "说话DNA（句式习惯/口头禅 + 原文示范句）",
+                value=card.get("speech_dna", ""),
+                height=80, key=f"csd_{real_idx}",
+                disabled=disabled_perm,
+                placeholder="示例：惜字如金，命令句为主，从不解释自己的决定。原句：'走。''不行。''闭嘴。'"
+            )
+            if not disabled_perm and new_sd != card.get("speech_dna", ""):
+                cards[real_idx]["speech_dna"] = new_sd
+                auto_save()
+
+            new_bd = st.text_area(
+                "行为DNA（愤怒/心软/恐惧/得意时的物理反应）",
+                value=card.get("behavior_dna", ""),
+                height=80, key=f"cbd_{real_idx}",
+                disabled=disabled_perm,
+                placeholder="示例：愤怒→下颌肌肉收紧但不说话；心软→手部动作与嘴上说的相反"
+            )
+            if not disabled_perm and new_bd != card.get("behavior_dna", ""):
+                cards[real_idx]["behavior_dna"] = new_bd
+                auto_save()
+
+            new_rl = st.text_area(
+                "红线（绝对不做的事）",
+                value=card.get("red_line", ""),
+                height=60, key=f"crl_{real_idx}",
+                disabled=disabled_perm,
+                placeholder="示例：绝不主动求人帮助；绝不在他人面前哭泣"
+            )
+            if not disabled_perm and new_rl != card.get("red_line", ""):
+                cards[real_idx]["red_line"] = new_rl
+                auto_save()
+
+            # 锁定/解锁性格核心按钮
+            pl1, pl2 = st.columns(2)
+            with pl1:
+                if perm_locked:
+                    if st.button(f"🔓 解锁性格核心", key=f"unlock_perm_{real_idx}",
+                                 use_container_width=True):
+                        cards[real_idx]["locked_permanent"] = False
+                        auto_save()
+                        st.rerun()
+                else:
+                    if st.button(f"🔒 锁定性格核心", key=f"lock_perm_{real_idx}",
+                                 use_container_width=True, type="primary"):
+                        cards[real_idx]["locked_permanent"] = True
+                        auto_save()
+                        st.rerun()
+
+            st.markdown("---")
+
+            # ── 可更新区（当前状态）──
+            st.markdown("""
+            <div style="background:#ebf8ff;border:1px solid #90cdf4;border-radius:8px;
+                        padding:10px 12px;margin-bottom:8px;">
+                <div style="font-size:0.78rem;font-weight:600;color:#2c5282;">
+                    📝 当前状态（每集可更新，随剧情变化）
+                </div>
+            </div>""", unsafe_allow_html=True)
+
+            new_cbs = st.text_area(
+                "身体状态",
+                value=card.get("current_body_state", ""),
+                height=60, key=f"ccbs_{real_idx}",
+                placeholder="示例：已变异为丧尸，面部肌肉无法做出正常表情，瞳孔灰白"
+            )
+            if new_cbs != card.get("current_body_state", ""):
+                cards[real_idx]["current_body_state"] = new_cbs
+                auto_save()
+
+            new_cms = st.text_area(
+                "心理状态",
+                value=card.get("current_mental_state", ""),
+                height=60, key=f"ccms_{real_idx}",
+                placeholder="示例：意识完整清醒，有羞耻感和饥饿感，对自身丧尸身份感到迷茫"
+            )
+            if new_cms != card.get("current_mental_state", ""):
+                cards[real_idx]["current_mental_state"] = new_cms
+                auto_save()
+
+            new_rel = st.text_area(
+                "当前关系动态",
+                value=card.get("relationships", ""),
+                height=80, key=f"crel_{real_idx}",
+                placeholder="示例：秦洛→陌生·警惕期，被他保护但感受到潜在杀意；陈小飞→熟悉·信任"
+            )
+            if new_rel != card.get("relationships", ""):
+                cards[real_idx]["relationships"] = new_rel
+                auto_save()
+
+            st.markdown("---")
+
+            # ── 底部控制按钮 ──
+            btn_cols = st.columns(4)
+
+            with btn_cols[0]:
+                if is_protagonist:
+                    st.markdown('<span class="tag tag-gold">👑 当前主角</span>', unsafe_allow_html=True)
+                else:
+                    if st.button("👑 设为主角", key=f"set_proto_{real_idx}",
+                                 use_container_width=True):
+                        # 取消之前主角标记
+                        for i, c in enumerate(cards):
+                            cards[i]["is_protagonist"] = False
+                        cards[real_idx]["is_protagonist"] = True
+                        st.session_state.protagonist_index = real_idx
+                        auto_save()
+                        st.success(f"✅ {name_display} 已设为主角")
+                        st.rerun()
+
+            with btn_cols[1]:
+                all_locked = card.get("locked_all", False)
+                if all_locked:
+                    if st.button("🔓 解除全卡锁定", key=f"unlock_all_{real_idx}",
+                                 use_container_width=True):
+                        cards[real_idx]["locked_all"] = False
+                        auto_save()
+                        st.rerun()
+                else:
+                    if st.button("🔒 锁定整张卡", key=f"lock_all_{real_idx}",
+                                 use_container_width=True):
+                        cards[real_idx]["locked_all"] = True
+                        cards[real_idx]["locked_permanent"] = True
+                        auto_save()
+                        st.rerun()
+
+            with btn_cols[2]:
+                if st.button("📋 复制卡片", key=f"copy_card_{real_idx}",
+                             use_container_width=True):
+                    import copy
+                    new_c = copy.deepcopy(card)
+                    new_c["name"] = f"{card.get('name', '')}（副本）"
+                    new_c["locked_all"] = False
+                    new_c["locked_permanent"] = False
+                    new_c["is_protagonist"] = False
+                    st.session_state.character_cards.append(new_c)
+                    auto_save()
+                    st.rerun()
+
+            with btn_cols[3]:
+                if st.button("🗑️ 删除", key=f"del_card_{real_idx}",
+                             use_container_width=True):
+                    st.session_state.character_cards.pop(real_idx)
+                    if st.session_state.protagonist_index == real_idx:
+                        st.session_state.protagonist_index = -1
+                    elif st.session_state.protagonist_index > real_idx:
+                        st.session_state.protagonist_index -= 1
+                    auto_save()
+                    st.rerun()
+
+# ============================================================
+# 步骤四：编剧控制台
+# ============================================================
+st.markdown("""
+<div class="card">
+    <div class="card-header">
+        <span class="card-icon">🎬</span>
+        <span class="card-title">步骤四：编剧控制台</span>
+        <span class="card-subtitle">开场设计 → 生成剧本 → 质检优化</span>
+    </div>
+</div>""", unsafe_allow_html=True)
+
+ad = bool(st.session_state.global_analysis)
+has_cards = len(st.session_state.character_cards) > 0
+has_protagonist = get_protagonist() is not None
+has_opening = st.session_state.selected_opening_index >= 0 and bool(st.session_state.parsed_openings)
+
+# 集数和章节
+t1, t2, t3 = st.columns([1, 2, 3])
+with t1:
+    en = st.number_input("集数", 1, 200, st.session_state.current_episode, key="ei")
+    st.session_state.current_episode = en
+with t2:
+    ec = st.multiselect("本集参考章节", st.session_state.chapter_order,
+                         key="ec", help="选择本集要改编的章节，可多选")
+with t3:
+    tags = []
+    tags.append(f'<span class="tag tag-blue">第{en}集</span>')
+    tags.append(f'<span class="tag tag-purple">{get_active_model()}</span>')
+    tags.append(f'<span class="tag {"tag-green" if ad else "tag-yellow"}">{"✅ 已提炼" if ad else "⚠️ 未提炼"}</span>')
+    tags.append(f'<span class="tag {"tag-green" if has_protagonist else "tag-red"}">{"👑 主角已设" if has_protagonist else "❌ 未设主角"}</span>')
+    tags.append(f'<span class="tag {"tag-green" if has_opening else "tag-yellow"}">{"✅ 开场已选" if has_opening else "⏳ 未选开场"}</span>')
+    st.markdown(f'<div style="display:flex;gap:6px;padding-top:24px;flex-wrap:wrap;">{"".join(tags)}</div>',
+                unsafe_allow_html=True)
+
+# 上集衔接
+with st.expander("🔗 上集衔接内容（可选）", expanded=False):
+    prev_ending_val = ""
+    # 从最近一集末尾自动提取
+    if st.session_state.episodes:
+        last_ep = max(st.session_state.episodes.keys())
+        last_script = st.session_state.episodes[last_ep]
+        prev_ending_val = last_script[-600:] if len(last_script) > 600 else last_script
+
+    prev_ending = st.text_area(
+        "上集末尾内容",
+        value=prev_ending_val,
+        height=120, key="prev_ending_input",
+        placeholder="留空 = 第一集 / 新篇章开始\n或粘贴上集最后的场景内容..."
+    )
+
+# 主功能按钮
+st.markdown("---")
+btn_col1, btn_col2, btn_col3 = st.columns(3)
+with btn_col1:
+    btn_opening = st.button("🎯 设计开场方案", key="b_opening", use_container_width=True,
+                             disabled=not (ad and st.session_state.api_key))
+with btn_col2:
+    btn_generate = st.button("🎬 生成剧本", key="b_generate", use_container_width=True,
+                              type="primary",
+                              disabled=not (ad and st.session_state.api_key))
+with btn_col3:
+    btn_review = st.button("🔍 质量检查", key="b_review", use_container_width=True,
+                            disabled=not (en in st.session_state.episodes and st.session_state.api_key))
+
+# ============================================================
+# 主内容 Tabs
+# ============================================================
+mt = st.tabs(["📝 剧本", "🔍 质检报告", "🎯 开场设计", "💬 对话", "📊 总览"])
+
+# ─── Tab 0：剧本 ───
+with mt[0]:
+    if btn_generate:
+        if not ad:
+            st.warning("⚠️ 请先完成步骤二的全局提炼")
+        elif not has_protagonist:
+            st.warning("⚠️ 请先在步骤三中设定主角")
+        else:
+            tx = get_combined_text(ec if ec else None)
+
+            opening_content = ""
+            if has_opening and en == 1:
+                idx = st.session_state.selected_opening_index
+                if 0 <= idx < len(st.session_state.parsed_openings):
+                    opening_content = st.session_state.parsed_openings[idx]["full"]
+
+            pe = prev_ending if prev_ending else ""
+            pr = build_episode_prompt(en, tx, opening_content, pe)
+            cx = st.session_state.messages + [{"role": "user", "content": pr}]
+
+            with st.spinner(f"🎬 正在生成第{en}集剧本..."):
+                r = call_api_streaming(cx)
+                if r:
+                    co = st.empty()
+                    f = stream_to_container(r, co)
+                    if f:
+                        st.session_state.episodes[en] = f
+                        st.session_state.messages = cx + [{"role": "assistant", "content": f}]
+                        st.session_state.current_step = max(st.session_state.current_step, 4)
+                        auto_save()
+                        st.success(f"✅ 第{en}集生成完成！")
+
+    st.markdown("---")
+    if st.session_state.episodes:
+        st.markdown("### 📜 已生成剧本")
+        se = sorted(st.session_state.episodes.keys())
+        et = st.tabs([f"第{e}集" for e in se])
+        for ix, e in enumerate(se):
+            with et[ix]:
+                s = st.session_state.episodes[e]
+                scene_count = len(re.findall(r'【场景[：:]', s))
+
+                m1, m2, m3, m4 = st.columns(4)
+                m1.metric("场景数", scene_count or "—")
+                m2.metric("字数", f"{len(s):,}")
+                m3.metric("质检", "✅" if e in st.session_state.review_results else "⏳")
+                m4.metric("主角", get_protagonist()["name"] if get_protagonist() else "—")
+
+                st.markdown(s)
+
+                d1, d2 = st.columns(2)
+                with d1:
+                    st.download_button(f"📥 下载 Markdown", s,
+                                       f"第{e}集剧本.md", "text/markdown", key=f"dl{e}")
+                with d2:
+                    st.download_button("📋 下载纯文本", s,
+                                       f"第{e}集剧本.txt", "text/plain", key=f"cd{e}")
+    else:
+        st.markdown("""
+        <div class="empty-state">
+            <div class="empty-icon">🎬</div>
+            <div class="empty-text">尚未生成任何剧本</div>
+            <div style="font-size:0.78rem;color:#cbd5e0;">完成提炼并设定主角后点击"生成剧本"</div>
+        </div>""", unsafe_allow_html=True)
+
+# ─── Tab 1：质检报告 ───
+with mt[1]:
+    if btn_review:
+        if en not in st.session_state.episodes:
+            st.warning(f"⚠️ 第{en}集尚未生成")
+        else:
+            tx = get_combined_text(ec if ec else None)
+            sc_text = st.session_state.episodes[en]
+            rm = [{"role": "user", "content": build_review_prompt(en, sc_text, tx)}]
+
+            og_model = st.session_state.model_id
+            if st.session_state.review_model:
+                st.session_state.model_id = st.session_state.review_model
+
+            with st.spinner(f"🔍 质检第{en}集中..."):
+                r = call_api_streaming(rm, REVIEW_SYSTEM_PROMPT)
+                if r:
+                    co = st.empty()
+                    f = stream_to_container(r, co)
+                    if f:
+                        st.session_state.review_results[en] = f
+                        st.session_state.current_step = max(st.session_state.current_step, 5)
+                        auto_save()
+                        st.success(f"✅ 第{en}集质检完成")
+
+            st.session_state.model_id = og_model
+
+    if st.session_state.review_results:
+        for e in sorted(st.session_state.review_results.keys()):
+            rv = st.session_state.review_results[e]
+            with st.expander(f"📊 第{e}集质检报告", expanded=(e == en)):
+                st.markdown(rv)
+                r1, r2, r3 = st.columns(3)
+                with r1:
+                    if st.button(f"🔧 应用修订版剧本", key=f"fx{e}", type="primary"):
+                        fix_prompt = f"""根据以下质检报告，输出修订后的完整剧本。
+如质检报告中已包含修订后剧本，直接输出该内容。
+如没有，根据改写建议修订后输出。
+只输出剧本正文，不需要其他说明。
+
+质检报告：
+{rv}
+
+原剧本：
+{st.session_state.episodes[e]}"""
+                        fm = [{"role": "user", "content": fix_prompt}]
+                        with st.spinner("🔧 应用修订中..."):
+                            r_fix = call_api_streaming(fm)
+                            if r_fix:
+                                co = st.empty()
+                                fixed = stream_to_container(r_fix, co)
+                                if fixed:
+                                    st.session_state.episodes[e] = fixed
+                                    auto_save()
+                                    st.success(f"✅ 第{e}集已更新！")
+                                    time.sleep(1)
+                                    st.rerun()
+                with r2:
+                    st.download_button("📥 下载报告", rv,
+                                       f"第{e}集_质检报告.md", "text/markdown", key=f"dr{e}")
+                with r3:
+                    if st.button("🔄 重新质检", key=f"rr{e}"):
+                        del st.session_state.review_results[e]
+                        st.rerun()
+    else:
+        st.markdown("""
+        <div class="empty-state">
+            <div class="empty-icon">🔍</div>
+            <div class="empty-text">暂无质检报告</div>
+        </div>""", unsafe_allow_html=True)
+
+# ─── Tab 2：开场设计 ───
+with mt[2]:
+    if btn_opening:
+        ms = st.session_state.messages + [{"role": "user", "content": build_opening_prompt()}]
+        with st.spinner("🎯 设计开场方案中..."):
+            r = call_api_streaming(ms)
+            if r:
+                co = st.empty()
+                f = stream_to_container(r, co)
+                if f:
+                    st.session_state.opening_designs = f
+                    parsed = parse_opening_designs(f)
+                    st.session_state.parsed_openings = parsed
+                    st.session_state.selected_opening_index = -1
+                    st.session_state.messages = ms + [{"role": "assistant", "content": f}]
+                    st.session_state.current_step = max(st.session_state.current_step, 3)
+                    auto_save()
+                    st.success(f"✅ 已生成{len(parsed)}个开场方案")
+
+    if st.session_state.parsed_openings:
+        st.markdown("### 🎯 选择开场方案（仅用于第1集）")
+        current_sel = st.session_state.selected_opening_index
+
+        for i, op in enumerate(st.session_state.parsed_openings):
+            is_selected = (i == current_sel)
+            border_color = "#3182ce" if is_selected else "#e2e8f0"
+            bg_color = "#ebf4ff" if is_selected else "#f7fafc"
+            selected_label = " ✅ 已选择" if is_selected else ""
+
+            st.markdown(f"""
+            <div style="background:{bg_color};border:2px solid {border_color};border-radius:10px;
+                        padding:14px 16px;margin:8px 0;">
+                <div style="font-size:0.9rem;font-weight:600;color:#2d3748;margin-bottom:6px;">
+                    {op['title']}{selected_label}
+                </div>
+                <div style="font-size:0.78rem;color:#718096;line-height:1.5;">{op['preview']}</div>
+            </div>""", unsafe_allow_html=True)
+
+            bc1, bc2 = st.columns([3, 1])
+            with bc1:
+                with st.expander("展开完整方案"):
+                    st.markdown(op['full'])
+            with bc2:
+                if is_selected:
+                    if st.button("❌ 取消", key=f"desel_{i}", use_container_width=True):
+                        st.session_state.selected_opening_index = -1
+                        auto_save()
+                        st.rerun()
+                else:
+                    if st.button("✅ 选择", key=f"sel_{i}", use_container_width=True, type="primary"):
+                        st.session_state.selected_opening_index = i
+                        auto_save()
+                        st.rerun()
+
+        if current_sel >= 0:
+            st.markdown(f"""
+            <div style="background:#f0fff4;border:1px solid #68d391;border-radius:8px;
+                        padding:10px 14px;margin-top:12px;">
+                <b>当前选择：</b>{st.session_state.parsed_openings[current_sel]['title']}
+            </div>""", unsafe_allow_html=True)
+
+        if st.button("🔄 重新设计开场方案", key="regen_opening"):
+            st.session_state.opening_designs = ""
+            st.session_state.parsed_openings = []
+            st.session_state.selected_opening_index = -1
+            auto_save()
+            st.rerun()
+    else:
+        st.markdown("""
+        <div class="empty-state">
+            <div class="empty-icon">🎯</div>
+            <div class="empty-text">尚未设计开场方案</div>
+            <div style="font-size:0.78rem;color:#cbd5e0;">完成全局提炼后点击"设计开场方案"</div>
+        </div>""", unsafe_allow_html=True)
+
+# ─── Tab 3：对话 ───
+with mt[3]:
+    st.markdown("### 💬 自由对话")
+    for mg in st.session_state.chat_history[-20:]:
+        with st.chat_message(mg["role"]):
+            st.markdown(mg["content"])
+
+    ui = st.chat_input("输入问题或指令...", key="ci")
+    if ui:
+        st.session_state.chat_history.append({"role": "user", "content": ui})
+        ctx_parts = []
+        if st.session_state.global_analysis:
+            ctx_parts.append(f"【全局提炼结果】\n{st.session_state.global_analysis[:2000]}")
+        cards_str = build_character_cards_prompt()
+        if cards_str:
+            ctx_parts.append(f"【角色驱动卡】\n{cards_str}")
+        if st.session_state.episodes:
+            la = max(st.session_state.episodes.keys())
+            ctx_parts.append(f"【最新剧本片段】\n{st.session_state.episodes[la][:1500]}")
+        ctx_str = "\n\n".join(ctx_parts)
+        fm = f"【背景信息】\n{ctx_str}\n\n【用户指令】\n{ui}" if ctx_str else ui
+
+        with st.chat_message("assistant"):
+            r = call_api_streaming([{"role": "user", "content": fm}])
+            if r:
+                co = st.empty()
+                f = stream_to_container(r, co)
+                if f:
+                    st.session_state.chat_history.append({"role": "assistant", "content": f})
+                    auto_save()
+
+# ─── Tab 4：总览 ───
+with mt[4]:
+    st.markdown("### 📊 项目总览")
+
+    o1, o2, o3, o4 = st.columns(4)
+    o1.metric("📚 章节数", len(st.session_state.chapter_order))
+    o2.metric("🎬 已生成集数", len(st.session_state.episodes))
+    o3.metric("✅ 已质检集数", len(st.session_state.review_results))
+    o4.metric("👥 角色卡数", len(st.session_state.character_cards))
+
+    if st.session_state.character_cards:
+        st.markdown("---")
+        st.markdown("#### 👥 角色卡状态")
+        for i, c in enumerate(st.session_state.character_cards):
+            is_p = (i == st.session_state.protagonist_index)
+            badges = []
+            if is_p:
+                badges.append('<span class="tag tag-gold">👑 主角</span>')
+            if c.get("locked_all"):
+                badges.append('<span class="tag tag-green">🔒 全卡锁定</span>')
+            elif c.get("locked_permanent"):
+                badges.append('<span class="tag tag-green">🔒 性格锁定</span>')
+            if c.get("current_body_state"):
+                badges.append('<span class="tag tag-blue">状态已设</span>')
+            badge_html = " ".join(badges) if badges else '<span class="tag tag-yellow">未锁定</span>'
+            st.markdown(f"""
+            <div class="chapter-item">
+                <div class="chapter-icon" style="background:{'linear-gradient(135deg,#f6ad55,#ed8936)' if is_p else 'linear-gradient(135deg,#667eea,#764ba2)'};">
+                    {'👑' if is_p else str(i+1)}
+                </div>
+                <div class="chapter-info">
+                    <div class="chapter-name">{c.get('name','未命名')} &nbsp; {badge_html}</div>
+                    <div class="chapter-meta">{c.get('core_personality','') or '未填写核心人格'}</div>
+                </div>
+            </div>""", unsafe_allow_html=True)
+
+    if st.session_state.episodes:
+        st.markdown("---")
+        st.markdown("#### 各集状态")
+        for e in sorted(st.session_state.episodes.keys()):
+            s = st.session_state.episodes[e]
+            scene_count = len(re.findall(r'【场景[：:]', s))
+            reviewed = "✅ 已质检" if e in st.session_state.review_results else "⏳ 未质检"
+            st.markdown(f"""
+            <div class="chapter-item">
+                <div class="chapter-icon" style="background:linear-gradient(135deg,#3182ce,#2b6cb0);">{e}</div>
+                <div class="chapter-info">
+                    <div class="chapter-name">
+                        第{e}集
+                        <span class="tag tag-blue">{scene_count}个场景</span>
+                        <span class="tag tag-green">{len(s):,}字</span>
+                    </div>
+                    <div class="chapter-meta">{reviewed}</div>
+                </div>
+            </div>""", unsafe_allow_html=True)
+
+# ============================================================
+# 底部
+# ============================================================
+st.markdown("---")
+protagonist = get_protagonist()
+proto_label = f"主角·{protagonist['name']}" if protagonist else "未设主角"
+st.markdown(f"""
+<div style="text-align:center;padding:16px 0;">
+    <span style="color:#a0aec0;font-size:0.75rem;">
+        🎬 影视化视觉翻译引擎 V5.0 · {proto_label} · 角色驱动卡系统 · 物理校验 · {get_active_model()}
+    </span>
+</div>""", unsafe_allow_html=True)
