@@ -654,42 +654,59 @@ def build_character_cards_prompt():
     return "\n".join(lines)
 
 def parse_cards_from_analysis(text):
-    """从全局提炼结果中自动解析角色驱动卡"""
+    """从全局提炼结果中自动解析角色驱动卡，返回结构化数据列表"""
     cards = []
     
-    # 寻找驱动卡块
-    pattern = r'【([^】]+)(?:驱动卡|的驱动卡|角色卡)】(.*?)(?=【[^】]+(?:驱动卡|角色卡)】|\Z)'
-    matches = re.findall(pattern, text, re.DOTALL)
+    # 策略1：寻找【XXX驱动卡】格式
+    pattern1 = r'【([^】]{1,20})(?:的)?驱动卡】(.*?)(?=【[^】]{1,20}(?:的)?驱动卡】|\Z)'
+    matches = re.findall(pattern1, text, re.DOTALL)
     
+    # 策略2：寻找 **XXX驱动卡** 或 ## XXX驱动卡 格式
     if not matches:
-        # 备用：寻找"角色：XXX"格式
-        pattern2 = r'(?:角色|人物)[：:]\s*([^\n]+)\n(.*?)(?=(?:角色|人物)[：:]|\Z)'
+        pattern2 = r'(?:\*\*|##\s*)([^\*\n]{1,20})(?:的)?驱动卡(?:\*\*)?(.*?)(?=(?:\*\*|##\s*)[^\*\n]{1,20}(?:的)?驱动卡|\Z)'
         matches = re.findall(pattern2, text, re.DOTALL)
+    
+    # 策略3：寻找"角色名：" + 驱动卡字段的组合
+    if not matches:
+        # 找所有包含驱动卡关键字段的段落
+        blocks = re.split(r'\n(?=\S)', text)
+        for block in blocks:
+            name_match = re.match(r'^[·•\-\*]?\s*([^\n：:（(【]{1,15})[：:]', block)
+            if name_match and any(k in block for k in ['核心人格', '说话DNA', '行为DNA', '红线']):
+                matches.append((name_match.group(1).strip(), block))
     
     for name, content in matches:
         name = name.strip()
-        if not name or len(name) > 20:
+        # 过滤无效名称
+        if not name or len(name) > 15:
+            continue
+        if any(k in name for k in ['第', '章', '集', '幕', '场景', '情节', '大纲', '分析']):
             continue
         
         card = make_empty_card()
         card["name"] = name
         
-        # 提取各字段
         def extract_field(text, keys):
             for key in keys:
-                pattern = rf'{key}[：:]\s*([^\n]+(?:\n(?![^\n]*[：:][^\n]*\n)[^\n]+)*)'
-                m = re.search(pattern, text)
+                # 匹配 "关键词：内容" 到下一个关键词或段落结束
+                p = rf'(?:{key})[：:]\s*([^\n]+(?:\n(?!(?:核心人格|说话DNA|行为DNA|红线|关系|当前|身体|心理|性格)[：:])[^\n]+)*)'
+                m = re.search(p, text)
                 if m:
-                    return m.group(1).strip()
+                    result = m.group(1).strip()
+                    # 清理多余符号
+                    result = re.sub(r'^[·•\-\*]\s*', '', result)
+                    return result
             return ""
         
-        card["core_personality"] = extract_field(content, ["核心人格", "人格", "性格核心", "核心定义"])
-        card["speech_dna"] = extract_field(content, ["说话DNA", "说话方式", "口头禅", "台词风格"])
-        card["behavior_dna"] = extract_field(content, ["行为DNA", "行为反应", "行为特征"])
-        card["red_line"] = extract_field(content, ["红线", "绝对不做", "禁区"])
-        card["relationships"] = extract_field(content, ["关系", "关系动态", "人际关系"])
+        card["core_personality"] = extract_field(content, ["核心人格", "人格定义", "性格核心", "核心定义", "人格"])
+        card["speech_dna"] = extract_field(content, ["说话DNA", "说话方式", "台词风格", "语言风格", "口头禅"])
+        card["behavior_dna"] = extract_field(content, ["行为DNA", "行为反应", "行为特征", "行为模式"])
+        card["red_line"] = extract_field(content, ["红线", "绝对不做", "禁区", "底线"])
+        card["relationships"] = extract_field(content, ["关系动态", "关系", "人际关系", "与.*关系"])
         
-        cards.append(card)
+        # 至少有一个字段有内容才算有效卡
+        if any([card["core_personality"], card["speech_dna"], card["behavior_dna"]]):
+            cards.append(card)
     
     return cards
 
@@ -1247,18 +1264,14 @@ with s2b:
                     st.session_state.global_analysis = f
                     st.session_state.messages = ms + [{"role": "assistant", "content": f}]
                     st.session_state.current_step = max(st.session_state.current_step, 1)
-                    # 自动解析驱动卡
+                     # 解析驱动卡并存入待导入列表，不直接覆盖
                     parsed_cards = parse_cards_from_analysis(f)
-                    if parsed_cards:
-                        # 合并：已有锁定的卡不覆盖
-                        existing_names = {c["name"] for c in st.session_state.character_cards if c.get("locked_all")}
-                        new_cards = [c for c in parsed_cards if c["name"] not in existing_names]
-                        # 保留已锁定的卡，追加新解析的卡
-                        locked_cards = [c for c in st.session_state.character_cards if c.get("locked_all")]
-                        st.session_state.character_cards = locked_cards + new_cards
-                        st.info(f"✅ 已自动解析 {len(new_cards)} 个角色驱动卡，请在步骤三中确认")
+                    st.session_state["_pending_cards"] = parsed_cards
                     auto_save()
-                    st.success("✅ 提炼完成！")
+                    if parsed_cards:
+                        st.success(f"✅ 提炼完成！已识别 {len(parsed_cards)} 个角色驱动卡，请在步骤三中点击导入")
+                    else:
+                        st.success("✅ 提炼完成！（未能自动识别驱动卡，请在步骤三手动填写或使用导入按钮）")
     elif st.session_state.global_analysis:
         with st.expander("📋 查看提炼结果", expanded=False):
             st.markdown(st.session_state.global_analysis)
@@ -1286,18 +1299,14 @@ with cc1:
         st.rerun()
 with cc2:
     if st.session_state.global_analysis:
-        if st.button("📥 从提炼结果重新导入", key="reimport_cards", use_container_width=True):
+        if st.button("📥 从提炼结果导入", key="reimport_cards", use_container_width=True):
             parsed = parse_cards_from_analysis(st.session_state.global_analysis)
+            st.session_state["_pending_cards"] = parsed
             if parsed:
-                locked = [c for c in st.session_state.character_cards if c.get("locked_all")]
-                locked_names = {c["name"] for c in locked}
-                new_c = [c for c in parsed if c["name"] not in locked_names]
-                st.session_state.character_cards = locked + new_c
-                auto_save()
-                st.success(f"✅ 导入 {len(new_c)} 个角色卡")
-                st.rerun()
+                st.success(f"✅ 已识别 {len(parsed)} 个角色，请在下方预览后确认导入")
             else:
-                st.warning("未能从提炼结果中解析到驱动卡，请检查提炼结果格式")
+                st.warning("未能自动识别角色驱动卡，请检查提炼结果中是否包含【XXX驱动卡】格式")
+            st.rerun()
 with cc3:
     protagonist = get_protagonist()
     if protagonist:
@@ -1312,7 +1321,59 @@ with cc3:
                     padding:8px 12px;font-size:0.72rem;text-align:center;color:#c53030;">
             ⚠️ 尚未设定主角，请在下方角色卡中设置
         </div>""", unsafe_allow_html=True)
+# ── 待导入预览区 ──
+pending = st.session_state.get("_pending_cards", [])
+if pending:
+    st.markdown(f"""
+    <div style="background:#fffaf0;border:2px solid #f6ad55;border-radius:10px;
+                padding:14px 16px;margin-bottom:16px;">
+        <div style="font-size:0.88rem;font-weight:600;color:#b7791f;margin-bottom:10px;">
+            📋 从提炼结果识别到 {len(pending)} 个角色驱动卡，请确认后导入
+        </div>
+    </div>""", unsafe_allow_html=True)
 
+    for pi, pc in enumerate(pending):
+        with st.expander(f"预览：{pc.get('name','未命名')}  —  {pc.get('core_personality','')[:40] or '（核心人格未填）'}", expanded=False):
+            prev_cols = st.columns(2)
+            with prev_cols[0]:
+                st.markdown("**核心人格**")
+                st.text(pc.get("core_personality") or "（未识别）")
+                st.markdown("**说话DNA**")
+                st.text(pc.get("speech_dna") or "（未识别）")
+            with prev_cols[1]:
+                st.markdown("**行为DNA**")
+                st.text(pc.get("behavior_dna") or "（未识别）")
+                st.markdown("**红线**")
+                st.text(pc.get("red_line") or "（未识别）")
+            if pc.get("relationships"):
+                st.markdown("**关系动态**")
+                st.text(pc["relationships"])
+
+    imp_c1, imp_c2, imp_c3 = st.columns(3)
+    with imp_c1:
+        if st.button("✅ 全部导入（追加）", key="import_append", use_container_width=True, type="primary"):
+            locked = [c for c in st.session_state.character_cards if c.get("locked_all")]
+            locked_names = {c["name"] for c in locked}
+            new_c = [c for c in pending if c["name"] not in locked_names]
+            st.session_state.character_cards = locked + new_c
+            st.session_state["_pending_cards"] = []
+            auto_save()
+            st.success(f"✅ 已导入 {len(new_c)} 个角色卡，请在下方编辑完善")
+            st.rerun()
+    with imp_c2:
+        if st.button("🔄 覆盖全部（清空重建）", key="import_overwrite", use_container_width=True):
+            st.session_state.character_cards = [c for c in pending]
+            st.session_state.protagonist_index = -1
+            st.session_state["_pending_cards"] = []
+            auto_save()
+            st.success(f"✅ 已覆盖，共 {len(pending)} 个角色卡")
+            st.rerun()
+    with imp_c3:
+        if st.button("❌ 取消导入", key="import_cancel", use_container_width=True):
+            st.session_state["_pending_cards"] = []
+            st.rerun()
+
+    st.markdown("---")
 if not cards:
     st.markdown("""
     <div class="empty-state">
