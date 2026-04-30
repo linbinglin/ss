@@ -305,41 +305,31 @@ def call_api(api_key, base_url, model, user_content):
 
 
 with st.sidebar:
-    st.markdown("## API Config")
+     st.markdown("## API Config")
     st.markdown("---")
 
-    api_key_input = st.text_input(
-        "API Key",
-        type="password",
-        placeholder="sk-xxx",
-    )
-
-    base_url_input = st.text_input(
-        "Base URL",
-        value="https://yunwu.ai/v1/",
-    )
-
-    model_choice = st.selectbox(
-        "Model",
-        options=PRESET_MODELS,
-        index=0,
-    )
-
-    if model_choice == "自定义输入":
+    with st.form("api_config_form", clear_on_submit=False):
+        api_key_input = st.text_input("API Key", type="password", placeholder="sk-xxx")
+        base_url_input = st.text_input("Base URL", value="https://yunwu.ai/v1/")
+        model_choice = st.selectbox("Model", options=PRESET_MODELS, index=0)
         custom_input = st.text_input(
-            "自定义 Model ID",
+            "自定义 Model ID（仅当上方选择'自定义输入'时生效）",
             value="",
-            placeholder="e.g. claude-opus-4-7",
+            placeholder="e.g. gemini-3-pro-preview",
         )
-        if custom_input and custom_input.strip():
-            final_model = custom_input.strip()
-        else:
-            final_model = ""
-            st.warning("Please enter a Model ID")
-    else:
-        final_model = model_choice
+        submitted = st.form_submit_button("保存配置", use_container_width=True)
 
-    st.caption("Model: " + final_model)
+    # 用 session_state 持久化
+    if submitted:
+        st.session_state["api_key"] = api_key_input.strip()
+        st.session_state["base_url"] = base_url_input.strip() or "https://yunwu.ai/v1/"
+        if model_choice == "自定义输入":
+            st.session_state["model"] = custom_input.strip()
+        else:
+            st.session_state["model"] = model_choice
+
+    cur_model = st.session_state.get("model", "")
+    st.caption("当前模型: " + (cur_model if cur_model else "（未保存）"))
     st.markdown("---")
 
 
@@ -356,13 +346,14 @@ input_method = st.radio(
 novel_text = ""
 
 if input_method == "粘贴文本":
-    raw = st.text_area(
-        "text",
-        height=280,
-        placeholder="请粘贴小说原文...",
-        label_visibility="collapsed",
-    )
-    novel_text = str(raw).strip() if raw else ""
+    with st.form("novel_form"):
+        raw = st.text_area("text", height=280,
+                           placeholder="请粘贴小说原文...",
+                           label_visibility="collapsed")
+        confirm = st.form_submit_button("确认原文", use_container_width=True)
+    if confirm:
+        st.session_state["novel_text"] = str(raw).strip()
+    novel_text = st.session_state.get("novel_text", "")
 
 else:
     uploaded_file = st.file_uploader(
@@ -396,16 +387,16 @@ st.markdown("---")
 generate_btn = st.button("开始生成剧本", use_container_width=True)
 
 if generate_btn:
-    safe_key = str(api_key_input).strip() if api_key_input else ""
-    safe_url = str(base_url_input).strip() if base_url_input else "https://yunwu.ai/v1/"
-    safe_model = str(final_model).strip() if final_model else ""
+    safe_key = st.session_state.get("api_key", "")
+    safe_url = st.session_state.get("base_url", "https://yunwu.ai/v1/")
+    safe_model = st.session_state.get("model", "")
     safe_text = str(novel_text).strip() if novel_text else ""
 
     if not safe_key:
-        st.error("请填写 API Key")
+        st.error("请先在左侧填写 API Key 并点击『保存配置』")
         st.stop()
     if not safe_model:
-        st.error("请选择或输入 Model ID")
+        st.error("请先在左侧选择或输入 Model ID 并点击『保存配置』")
         st.stop()
     if not safe_text:
         st.error("请输入或上传原文")
