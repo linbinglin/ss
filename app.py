@@ -247,37 +247,61 @@ def call_api(api_key, base_url, model, user_content):
     base_url = base_url.rstrip("/") + "/"
     url = base_url + "chat/completions"
 
-    with requests.post(url, headers=headers, json=payload, stream=True, timeout=120) as resp:
-        resp.raise_for_status()
-        for line in resp.iter_lines():
-            if not line:
-                continue
-            decoded = line.decode("utf-8")
-            if decoded.startswith("data: "):
-                decoded = decoded[6:]
-            if decoded.strip() == "[DONE]":
-                break
+    with requests.post(url, headers=headers, json=payload, stream=True, timeout=180) as resp:
+        if resp.status_code >= 400:
             try:
-                chunk = json.loads(decoded)
-                # 增加安全判断，防止 choices 为空
-                if not chunk.get("choices"): 
-                    continue
+                err_text = resp.text
+            except Exception:
+                err_text = ""
+            raise requests.exceptions.HTTPError(
+                str(resp.status_code) + " 上游返回: " + err_text[:500],
+                response=resp,
+            )
 
-                delta = chunk["choices"][0]["delta"]
+        ctype = resp.headers.get("Content-Type", "")
+        if "application/json" in ctype and "event-stream" not in ctype:
+            try:
+                data = resp.json()
+                content = (data.get("choices", [{}])[0].get("message", {}) or {}).get("content") or ""
+                if content:
+                    yield content
+                return
+            except Exception:
+                pass
 
-                # 1. 获取正文内容，并确保它不是 None
-                content = delta.get("content")
-                if content is not None:
-                    yield str(content)
-
-                # 2. 强烈建议加上对 reasoning_content 的解析（兼容 DeepSeek 深度思考模型）
-                # 否则在使用带有思考过程的模型时，界面会长时间卡住假死
-                reasoning_content = delta.get("reasoning_content")
-                if reasoning_content is not None:
-                    yield str(reasoning_content)
-                
+        for raw_line in resp.iter_lines():
+            if not raw_line:
+                continue
+            try:
+                decoded = raw_line.decode("utf-8", errors="ignore")
             except Exception:
                 continue
+
+            if decoded.startswith("data:"):
+                decoded = decoded[5:].lstrip()
+            if not decoded:
+                continue
+            if decoded == "[DONE]":
+                break
+
+            try:
+                chunk = json.loads(decoded)
+            except Exception:
+                continue
+
+            if isinstance(chunk, dict) and chunk.get("error"):
+                err = chunk["error"]
+                msg = err.get("message") if isinstance(err, dict) else str(err)
+                raise RuntimeError("上游返回错误: " + str(msg))
+
+            choices = chunk.get("choices") or []
+            if not choices:
+                continue
+
+            delta = choices[0].get("delta") or choices[0].get("message") or {}
+            piece = delta.get("content") or ""
+            if piece:
+                yield piece
 
 
 with st.sidebar:
@@ -422,20 +446,28 @@ if generate_btn:
             use_container_width=True,
         )
 
-    except requests.exceptions.ConnectionError:
+     except requests.exceptions.HTTPError as e:
         progress_bar.empty()
-        st.error("连接失败，请检查 Base URL")
-    except requests.exceptions.HTTPError as e:
-        progress_bar.empty()
-        code = e.response.status_code if e.response else 0
+        code = getattr(e.response, "status_code", 0) if e.response is not None else 0
+        body = ""
+        try:
+            if e.response is not None:
+                body = e.response.text[:300]
+        except Exception:
+            pass
         if code == 401:
             st.error("API Key 无效")
         elif code == 429:
             st.error("请求频率超限")
         elif code == 404:
-            st.error("模型不存在，请检查 Model ID")
+            st.error("模型不存在或路径错误，请检查 Model ID 与 Base URL")
+        elif code == 0:
+            st.error("上游返回异常（无 HTTP 状态码）：" + str(e))
         else:
-            st.error("HTTP 错误 " + str(code))
+            st.error("HTTP 错误 " + str(code) + "：" + (body or str(e)))
+    except RuntimeError as e:
+        progress_bar.empty()
+        st.error(str(e))
     except requests.exceptions.Timeout:
         progress_bar.empty()
         st.error("请求超时，请缩短原文后重试")
