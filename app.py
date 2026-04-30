@@ -381,7 +381,8 @@ if novel_text:
     with col2:
         st.metric("预计场景", "~" + str(max(1, len(novel_text) // 300)) + " 场")
     with col3:
-        st.metric("模型", final_model if final_model else "未选择")
+        # 将 final_model 改为 cur_model
+        st.metric("模型", cur_model if cur_model else "未选择")
 
 st.markdown("---")
 generate_btn = st.button("开始生成剧本", use_container_width=True)
