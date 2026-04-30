@@ -305,7 +305,7 @@ def call_api(api_key, base_url, model, user_content):
 
 
 with st.sidebar:
-     st.markdown("## API Config")
+    st.markdown("## API Config")
     st.markdown("---")
 
     with st.form("api_config_form", clear_on_submit=False):
