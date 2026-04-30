@@ -43,10 +43,10 @@ SYSTEM_PROMPT = """你是"短剧改编编剧"，任务是把输入小说改编�
 ====================
 1) 忠于原著：不新增关键剧情，不改因果，不改人物核心性格。
 2) 影视化：不是复述小说，而是转成可拍画面与有效对白。
-3) 逻辑清晰：人物对话逻辑清醒，环环相扣，事件衔接清晰明确到位。
+3) 逻辑清晰：人物问答有对应，事件衔接丝滑，观众能跟上。
 4) 情绪有效：能调动情绪，但不刻意拉扯同一情绪包袱。
 5) 实用输出：格式简洁，便于直接进入拍摄拆解。
-6) 描述内容：把主角的心理活动，化为内心OS描述，展现主角独有的人格魅力
+6) 描述内容：把女主许多多的心理活动，化为内心OS描述，增加许多多的戏份，展现她的人格魅力
 
 ====================
 二、优先级（冲突时按此顺序）
@@ -247,73 +247,23 @@ def call_api(api_key, base_url, model, user_content):
     base_url = base_url.rstrip("/") + "/"
     url = base_url + "chat/completions"
 
-    with requests.post(url, headers=headers, json=payload, stream=True, timeout=180) as resp:
-        # 如果上游直接返回错误 JSON（非流式错误），先尝试读出来抛给用户
-        ctype = resp.headers.get("Content-Type", "")
-        if resp.status_code >= 400 or "application/json" in ctype and "stream" not in ctype:
-            try:
-                err_text = resp.text
-            except Exception:
-                err_text = ""
-            if resp.status_code >= 400:
-                raise requests.exceptions.HTTPError(
-                    f"{resp.status_code} 上游返回: {err_text[:500]}", response=resp
-                )
-            # 200 但是返回的是整段 JSON（非流式），兼容处理
-            try:
-                data = json.loads(err_text)
-                content = data["choices"][0]["message"].get("content") or ""
-                if content:
-                    yield content
-                return
-            except Exception:
-                pass
-
-        for raw_line in resp.iter_lines():
-            if not raw_line:
+    with requests.post(url, headers=headers, json=payload, stream=True, timeout=120) as resp:
+        resp.raise_for_status()
+        for line in resp.iter_lines():
+            if not line:
                 continue
-            try:
-                decoded = raw_line.decode("utf-8", errors="ignore")
-            except Exception:
-                continue
-
-            # 处理 SSE 前缀
-            if decoded.startswith("data:"):
-                decoded = decoded[5:].lstrip()
-            if not decoded or decoded == "[DONE]":
-                if decoded == "[DONE]":
-                    break
-                continue
-
+            decoded = line.decode("utf-8")
+            if decoded.startswith("data: "):
+                decoded = decoded[6:]
+            if decoded.strip() == "[DONE]":
+                break
             try:
                 chunk = json.loads(decoded)
+                delta = chunk["choices"][0]["delta"]
+                if "content" in delta:
+                    yield delta["content"]
             except Exception:
                 continue
-
-            # 上游错误（部分中转站会在流里塞 error 字段）
-            if isinstance(chunk, dict) and chunk.get("error"):
-                err = chunk["error"]
-                msg = err.get("message") if isinstance(err, dict) else str(err)
-                raise RuntimeError("上游返回错误: " + str(msg))
-
-            choices = chunk.get("choices") or []
-            if not choices:
-                # 有些 chunk 只有 usage / 心跳，跳过
-                continue
-
-            delta = choices[0].get("delta") or choices[0].get("message") or {}
-
-            # 关键：content 可能是 None，必须用 or ""
-            piece = delta.get("content") or ""
-
-            # 兼容推理模型（DeepSeek-Reasoner 等）的 reasoning_content
-            # 这里不输出推理内容到正文，只输出最终 content；如想看推理过程可放开
-            # reasoning = delta.get("reasoning_content") or ""
-            # if reasoning:
-            #     yield reasoning
-
-            if piece:
-                yield piece
 
 
 with st.sidebar:
@@ -463,26 +413,15 @@ if generate_btn:
         st.error("连接失败，请检查 Base URL")
     except requests.exceptions.HTTPError as e:
         progress_bar.empty()
-        code = getattr(e.response, "status_code", 0) if e.response is not None else 0
-        body = ""
-        try:
-            if e.response is not None:
-                body = e.response.text[:300]
-        except Exception:
-            pass
+        code = e.response.status_code if e.response else 0
         if code == 401:
             st.error("API Key 无效")
         elif code == 429:
             st.error("请求频率超限")
         elif code == 404:
-            st.error("模型不存在或路径错误，请检查 Model ID 与 Base URL")
-        elif code == 0:
-            st.error("上游返回异常（无 HTTP 状态码）：" + str(e))
+            st.error("模型不存在，请检查 Model ID")
         else:
-            st.error(f"HTTP 错误 {code}：{body or str(e)}")
-    except RuntimeError as e:
-        progress_bar.empty()
-        st.error(str(e))
+            st.error("HTTP 错误 " + str(code))
     except requests.exceptions.Timeout:
         progress_bar.empty()
         st.error("请求超时，请缩短原文后重试")
