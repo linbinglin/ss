@@ -259,9 +259,23 @@ def call_api(api_key, base_url, model, user_content):
                 break
             try:
                 chunk = json.loads(decoded)
+                # 增加安全判断，防止 choices 为空
+                if not chunk.get("choices"): 
+                    continue
+
                 delta = chunk["choices"][0]["delta"]
-                if "content" in delta:
-                    yield delta["content"]
+
+                # 1. 获取正文内容，并确保它不是 None
+                content = delta.get("content")
+                if content is not None:
+                    yield str(content)
+
+                # 2. 强烈建议加上对 reasoning_content 的解析（兼容 DeepSeek 深度思考模型）
+                # 否则在使用带有思考过程的模型时，界面会长时间卡住假死
+                reasoning_content = delta.get("reasoning_content")
+                if reasoning_content is not None:
+                    yield str(reasoning_content)
+                
             except Exception:
                 continue
 
